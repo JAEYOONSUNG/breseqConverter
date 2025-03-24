@@ -11,7 +11,7 @@ MAX_LINE_WIDTH = 80
 QUALIFIER_START = 21
 FEATURE_WIDTH = 15
 
-def convert_dna_to_genbank(dna_file_path, temp_file_prefix="temp_genbank"):
+def convert_dna_to_genbank(dna_file_path, temp_file_prefix="temp_genbank", timeout=300):
     """SnapGene .dna 파일을 .gbk로 변환"""
     logging.info(f"Converting {dna_file_path} to GenBank format")
     snapgene_path = "/Applications/SnapGene.app/Contents/MacOS/SnapGene"
@@ -21,16 +21,25 @@ def convert_dna_to_genbank(dna_file_path, temp_file_prefix="temp_genbank"):
         logging.info(f"{temp_gb_file} already exists, using existing file")
         return temp_gb_file
     
-    cmd = f'"{snapgene_path}" --convert "GenBank - SnapGene" --input "{dna_file_path}" --output "{temp_gb_file}"'
-    logging.debug(f"Executing command: {cmd}")
+    cmd = [snapgene_path, "--convert", "GenBank - SnapGene", "--input", dna_file_path, "--output", temp_gb_file]
+    logging.debug(f"Executing command: {' '.join(cmd)}")
     
     try:
-        exit_code = os.system(cmd)
-        if exit_code != 0:
-            raise RuntimeError(f"SnapGene CLI failed with exit code {exit_code}")
+        result = subprocess.run(cmd, check=True, timeout=timeout, capture_output=True, text=True)
+        logging.debug(f"SnapGene output: {result.stdout}")
         if not os.path.exists(temp_gb_file):
             raise FileNotFoundError(f"Output file {temp_gb_file} not generated")
         logging.info(f"Converted {dna_file_path} to {temp_gb_file}")
+    except subprocess.TimeoutExpired as e:
+        logging.error(f"Conversion timed out after {timeout} seconds: {e.stdout}\n{e.stderr}")
+        if os.path.exists(temp_gb_file):
+            os.remove(temp_gb_file)
+        raise
+    except subprocess.CalledProcessError as e:
+        logging.error(f"SnapGene CLI failed with exit code {e.returncode}: {e.stderr}")
+        if os.path.exists(temp_gb_file):
+            os.remove(temp_gb_file)
+        raise
     except Exception as e:
         logging.error(f"Error during conversion: {str(e)}")
         if os.path.exists(temp_gb_file):
@@ -71,19 +80,17 @@ def hsv_to_hex(h, s, v):
 
 def get_color_for_group(group, stage_names):
     """그룹에 따라 채도가 점차 옅어지는 색상 반환"""
-    # Magenta: Hue=300, Saturation=100%, Value=100%
     base_hue = 300
     base_saturation = 100
     base_value = 100
     
-    # 그룹 인덱스에 따라 채도 감소 (100%, 80%, 60%, 40%, 20%)
     if group == "Unknown":
-        return "#FF00FF"  # 기본 Magenta
+        return "#FF00FF"
     try:
         group_index = stage_names.index(group)
-        saturation = max(20, 100 - group_index * 20)  # 20%씩 감소, 최소 20%
+        saturation = max(20, 100 - group_index * 20)
     except ValueError:
-        saturation = 100  # 알 수 없는 그룹은 기본 Magenta
+        saturation = 100
     
     return hsv_to_hex(base_hue, saturation, base_value)
 
@@ -114,36 +121,43 @@ def parse_mutation_range(position, mutation=None, annotation=None, sheet_name="M
         ranges.append((start, end))
     
     elif sheet_name == "Missing":
+        # start 파싱
         start_parts = pos_str.split('-')
         if len(start_parts) == 2:
             start1, start2 = map(int, start_parts)
         else:
             start1 = start2 = int(pos_str)
         
+        # end 파싱
         if end_position and pd.notna(end_position):
             end_str = str(end_position).replace(',', '').replace('–', '-').rstrip('-')
             end_parts = end_str.split('-')
-            if len(end_parts) == 2:
+            if len(end_parts) == 2:  # WWW-ZZZ 형식
                 end1, end2 = map(int, end_parts)
-            else:
+            else:  # WWW 형식 (단일 값)
                 end1 = end2 = int(end_str)
         else:
-            end1 = end2 = start1
+            end1 = end2 = start2
+            end_parts = [str(end1)]
         
-        start1, end1 = min(start1, end1), max(start1, end1)
-        start2, end2 = min(start2, end2), max(start2, end2)
+        # start와 end가 모두 범위일 경우
+        if len(start_parts) == 2 and len(end_parts) == 2:
+            ranges.append((start1, end1))  # 첫 번째 시작점과 첫 번째 끝점
+            ranges.append((start2, end2))  # 두 번째 시작점과 두 번째 끝점
+        # start가 범위이고 end가 단일 값일 경우
+        elif len(start_parts) == 2 and len(end_parts) == 1:
+            ranges.append((start1, end1))
+            ranges.append((start2, end1))
+        # start가 단일 값이고 end가 범위일 경우
+        elif len(start_parts) == 1 and len(end_parts) == 2:
+            ranges.append((start1, end1))
+            ranges.append((start1, end2))
+        # start와 end가 모두 단일 값일 경우
+        else:
+            ranges.append((start1, end1))
         
-        ranges.append((start1, end1))
-        if start1 != start2 or end1 != end2:
-            ranges.append((start2, end2))
-        
-        if annotation and pd.notna(annotation) and 'Δ' in annotation:
-            try:
-                delta = int(annotation.split('Δ')[1].split()[0].replace(',', ''))
-                if delta != (end1 - start1 + 1) and delta != (end2 - start2 + 1):
-                    logging.warning(f"Annotation delta {delta} does not match start-end range in Missing: {start1}-{end1}, {start2}-{end2}")
-            except (ValueError, IndexError) as e:
-                logging.warning(f"Could not parse delta from annotation in Missing: {annotation} - {str(e)}")
+        # 디버깅 로그 추가
+        logging.debug(f"Parsed ranges for {sheet_name}: start={pos_str}, end={end_position}, ranges={ranges}")
     
     return ranges
 
@@ -180,8 +194,11 @@ def create_annotated_genbank(dna_file, xlsx_file, output_genbank_file, sheets=["
         def find_first_detection(row):
             for stage in stage_names:
                 mutation_col = f"mutation.{stage}/output/index.html" if sheet_name == "Mutations" else None
+                end_col = f"end.{stage}/output/index.html" if sheet_name == "Missing" else None
                 if mutation_col and mutation_col in df.columns and pd.notna(row[mutation_col]):
                     return stage, row[mutation_col]
+                if end_col and end_col in df.columns and pd.notna(row[end_col]):
+                    return stage, "Missing Coverage"
                 for col in df.columns:
                     if stage in col and pd.notna(row[col]):
                         return stage, row.get(mutation_col, "Missing Coverage") if mutation_col else "Missing Coverage"
@@ -197,8 +214,12 @@ def create_annotated_genbank(dna_file, xlsx_file, output_genbank_file, sheets=["
         for _, row in df.dropna(subset=[position_col]).iterrows():
             pos_str = str(row[position_col])
             mutation = row['first_mutation']
+            stage = row['first_detection']
             annotation = str(row.get('annotation', 'Unknown')) if 'annotation' in df.columns else 'Unknown'
-            end_position = row.get('end', None) if 'end' in df.columns else None
+            
+            # 동적으로 end 열 찾기
+            end_col = f"end.{stage}/output/index.html" if sheet_name == "Missing" else 'end'
+            end_position = row.get(end_col, None) if end_col in df.columns else None
             
             if pd.isna(mutation) or mutation.lower() == 'nan':
                 mutation = "Missing Coverage"
@@ -211,12 +232,18 @@ def create_annotated_genbank(dna_file, xlsx_file, output_genbank_file, sheets=["
                 logging.warning(f"Skipping invalid position/mutation in {sheet_name}: {pos_str}/{mutation} - {str(e)}")
                 continue
             
-            stage = row['first_detection']
             label_prefix = "[Mutation]" if sheet_name == "Mutations" else "[Missing]"
-            label = f"{label_prefix} {mutation} {annotation}".strip()
             color = get_color_for_group(stage, stage_names)
             
-            for start, end in ranges:
+            for i, (start, end) in enumerate(ranges):
+                if sheet_name == "Missing":
+                    delta = end - start + 1  # 구간 크기
+                    label = f"{label_prefix} Δ{delta} {annotation}".strip()
+                    logging.debug(f"Range {i+1} in {sheet_name}: {start}-{end}, delta={delta}, label={label}")
+                else:
+                    label = f"{label_prefix} {mutation} {annotation}".strip()
+                    logging.debug(f"Range {i+1} in {sheet_name}: {start}-{end}, label={label}")
+                
                 feature_line = f"     misc_feature    {start}..{end}\n"
                 new_feature_lines.append(feature_line)
                 

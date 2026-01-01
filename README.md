@@ -1,8 +1,6 @@
 # breseqConverter
-![Fig  S10](https://github.com/user-attachments/assets/4107d550-f704-4bcb-9437-47bf8f9eb504)
-# breseqConverter
-
 An R package for parsing, comparing, and visualizing genomic mutation data from [breseq](https://barricklab.org/twiki/bin/view/Lab/ToolsBacterialGenomeResequencing) output files. Designed for tracking genomic changes during bacterial strain engineering and adaptive laboratory evolution (ALE) experiments.
+![Fig  S10](https://github.com/user-attachments/assets/4107d550-f704-4bcb-9437-47bf8f9eb504)
 
 ## Overview
 

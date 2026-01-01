@@ -225,15 +225,16 @@ pdf("plot.pdf", width = dims$width, height = dims$height)
 If you use this package, please cite:
 
 ```
-breseqConverter: An R package for comparing breseq mutation outputs
-[Your Name], [Year]
+[DNMB] DNMB: Deletion of non-canonical defense systems enable domestication of non-model Geobacillus for thermophilic platform engineering.
+             Jae-Yoon Sung, Mun Hoe Lee, Jungsoo Park, Hyungbin Kim, Dariimaa Ganbat, Donggyu Kim, Hyun-Woo Cho, Sang Jae Lee, Seong Bo Kim, and Dong-Woo Lee. 2024.
+             XXX, XXX, https://doi.org/XXX
+
+[breseq] breseq: Identification of mutations in laboratory-evolved microbes from next-generation sequencing data using breseq.
+                 Deatherage DE, Barrick JE (2014) 
+                 Methods Mol Biol 1151:165-188.
 ```
 
-Also cite breseq:
-> Deatherage DE, Barrick JE (2014) Identification of mutations in laboratory-evolved microbes from next-generation sequencing data using breseq. Methods Mol Biol 1151:165-188.
 
 ## License
 MIT License
 
-## Contributing
-Issues and pull requests welcome at [GitHub repository URL].

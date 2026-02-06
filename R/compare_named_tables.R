@@ -18,16 +18,16 @@
 #' for (name in names(comparison_results)) {
 #'   print(comparison_results[[name]])
 #' }
-compare_named_tables <- function(list_A, list_B) {
-  
+compare_named_tables <- function(list_A, list_B, name_A = NULL, name_B = NULL) {
+
   # Ensure both lists have the same names for comparison
   if (!all(names(list_A) == names(list_B))) {
     stop("Lists A and B must have the same names for comparison.")
   }
-  
-  # Capture the names of list_A and list_B to use as dynamic suffixes
-  suffix_A <- deparse(substitute(list_A))
-  suffix_B <- deparse(substitute(list_B))
+
+  # Use provided names or fall back to deparse
+  suffix_A <- if (!is.null(name_A)) name_A else deparse(substitute(list_A))
+  suffix_B <- if (!is.null(name_B)) name_B else deparse(substitute(list_B))
   
   # Initialize a list to store comparison results for each named pair
   comparison_results <- list()
@@ -53,11 +53,11 @@ compare_named_tables <- function(list_A, list_B) {
     }
     
     # Perform the join and compare by the chosen column with dynamic suffixes
-    comparison <- full_join(df_A, df_B, by = comparison_column, suffix = c(paste0(".", suffix_A), paste0(".", suffix_B))) %>%
-      mutate(
-        status = case_when(
-          rowSums(is.na(select(., ends_with(paste0(".", suffix_A))))) == length(select(., ends_with(paste0(".", suffix_A)))) ~ paste("New in", suffix_B),
-          rowSums(is.na(select(., ends_with(paste0(".", suffix_B))))) == length(select(., ends_with(paste0(".", suffix_B)))) ~ paste("Missing in", suffix_B),
+    comparison <- dplyr::full_join(df_A, df_B, by = comparison_column, suffix = c(paste0(".", suffix_A), paste0(".", suffix_B))) |>
+      dplyr::mutate(
+        status = dplyr::case_when(
+          rowSums(is.na(dplyr::select(., dplyr::ends_with(paste0(".", suffix_A))))) == length(dplyr::select(., dplyr::ends_with(paste0(".", suffix_A)))) ~ paste("New in", suffix_B),
+          rowSums(is.na(dplyr::select(., dplyr::ends_with(paste0(".", suffix_B))))) == length(dplyr::select(., dplyr::ends_with(paste0(".", suffix_B)))) ~ paste("Missing in", suffix_B),
           TRUE ~ "Unchanged or Modified"
         )
       )

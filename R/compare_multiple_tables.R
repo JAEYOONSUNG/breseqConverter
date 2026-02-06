@@ -22,19 +22,29 @@ compare_multiple_tables <- function(list_of_tables) {
   # Initialize an empty list to store all comparison results
   all_comparisons <- list()
   
+  # Get sample names from list keys
+  sample_names <- names(list_of_tables)
+
   # Sequentially compare each pair of tables
   for (i in 1:(length(list_of_tables) - 1)) {
-    cat("Comparing Set", i, "to Set", i + 1, "\n")
-    
+    name_A <- sample_names[i]
+    name_B <- sample_names[i + 1]
+
+    cat("Comparing:", name_A, "to", name_B, "\n")
+
     # Extract the current and next lists to compare
     list_A <- list_of_tables[[i]]
     list_B <- list_of_tables[[i + 1]]
-    
-    # Perform the comparison using the existing compare_named_tables function
-    comparison_results <- compare_named_tables(list_A, list_B)
-    
+
+    # Perform the comparison with actual sample names as suffixes
+    comparison_results <- compare_named_tables(
+      list_A, list_B,
+      name_A = paste0(name_A, "/output/index"),
+      name_B = paste0(name_B, "/output/index")
+    )
+
     # Store the comparison results with a meaningful name
-    comparison_name <- paste0("Comparison_", i, "_to_", i + 1)
+    comparison_name <- paste0("Comparison_", name_A, "_to_", name_B)
     all_comparisons[[comparison_name]] <- comparison_results
   }
   

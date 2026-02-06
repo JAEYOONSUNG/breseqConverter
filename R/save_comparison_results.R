@@ -12,35 +12,32 @@
 #' # Example usage:
 #' save_comparison_results_to_excel(comparison_results, "output.xlsx")
 save_comparison_results_to_excel <- function(comparison_results, file_name) {
-  
-  # Load necessary library
-  library(openxlsx)
-  
+
   # Create a new workbook
-  wb <- createWorkbook()
-  
+  wb <- openxlsx::createWorkbook()
+
   # Define a mapping for simplified sheet names
   sheet_names <- c("Mutation predictions" = "Mutations",
                    "Unassigned missing coverage evidence" = "Missing",
                    "Unassigned new junction evidence" = "New junction")
-  
+
   # Loop through each data frame in `comparison_results` and add it as a new sheet
   for (name in names(comparison_results)) {
     # Use the simplified name from the mapping or default to the original name
     simplified_name <- sheet_names[name]
     if (is.na(simplified_name)) simplified_name <- name  # Fallback to original name if not mapped
-    
+
     # Ensure sheet name is within the Excel limit (31 characters)
     simplified_name <- substr(simplified_name, 1, 31)
-    
+
     # Add a new sheet and write the data frame to it
-    addWorksheet(wb, simplified_name)
-    writeData(wb, sheet = simplified_name, comparison_results[[name]])
+    openxlsx::addWorksheet(wb, simplified_name)
+    openxlsx::writeData(wb, sheet = simplified_name, comparison_results[[name]])
   }
-  
+
   # Save the workbook to the specified file
-  saveWorkbook(wb, file_name, overwrite = TRUE)
-  
+  openxlsx::saveWorkbook(wb, file_name, overwrite = TRUE)
+
   # Confirm save location
   cat("Excel file saved to:", file_name, "\n")
 }

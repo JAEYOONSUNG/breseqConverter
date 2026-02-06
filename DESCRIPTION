@@ -1,11 +1,40 @@
 Package: breseqConverter
-Title: Process and Extract Named Tables from breseq HTML Output
-Version: 0.0.1
-Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+Title: Parse, Compare, and Visualize breseq Mutation Data
+Version: 1.0.0
+Authors@R:
+    person("Jae-Yoon", "Sung", email = "sungjaeyoon92@gmail.com",
+           role = c("aut", "cre"),
+           comment = c(ORCID = "YOUR-ORCID-ID"))
+Description: A comprehensive toolkit for analyzing bacterial genome resequencing
+    data from breseq. Extracts mutation tables from breseq HTML output, compares
+    mutations across multiple evolution stages, classifies mutation types (SNP,
+    indel, deletion, etc.), handles circular genome position normalization for
+    plasmids, generates publication-ready visualizations, and exports annotated
+    GenBank files for viewing in SnapGene. Designed for strain engineering and
+    adaptive laboratory evolution (ALE) experiments.
+License: MIT + file LICENSE
+URL: https://github.com/JAEYOONSUNG/breseqConverter
+BugReports: https://github.com/JAEYOONSUNG/breseqConverter/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.3
+Depends:
+    R (>= 4.0.0)
+Imports:
+    dplyr,
+    rvest,
+    openxlsx
+Suggests:
+    ggplot2,
+    ggrepel,
+    processx,
+    circlize,
+    ComplexHeatmap,
+    RColorBrewer,
+    gtools,
+    reshape2,
+    stringr,
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+Config/testthat/edition: 3

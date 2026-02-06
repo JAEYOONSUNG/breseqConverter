@@ -14,9 +14,6 @@
 #' # Process files in the current directory
 #' extract_named_tables()
 extract_named_tables <- function(directory = ".", file_pattern = "index.*\\.html") {
-  # Load required libraries
-  library(rvest)
-  library(dplyr)
 
   # Find files matching the pattern
   html_files <- list.files(directory, pattern = file_pattern, full.names = TRUE)
@@ -31,7 +28,7 @@ extract_named_tables <- function(directory = ".", file_pattern = "index.*\\.html
     # Read the HTML file
     html_data <- rvest::read_html(file_path)
     # Extract all tables
-    tables <- html_data %>% rvest::html_table(fill = TRUE)
+    tables <- html_data |> rvest::html_table(fill = TRUE)
     # Remove the first table if unnecessary
     tables <- tables[-1]
     # Assign new names

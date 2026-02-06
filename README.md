@@ -16,11 +16,8 @@ An R package for parsing, comparing, and visualizing genomic mutation data from 
 ## Installation
 
 ```r
-# From GitHub (recommended)
+# From GitHub
 devtools::install_github("JAEYOONSUNG/breseqConverter")
-
-# Or install locally
-install.packages("path/to/breseqConverter", repos = NULL, type = "source")
 ```
 
 ## Dependencies
@@ -43,19 +40,16 @@ BiocManager::install(c("ComplexHeatmap", "Biostrings"))
 ```r
 library(breseqConverter)
 
-# Define breseq output directories
-breseq_dirs <- c(
-  "WT" = "./breseq_WT",
-  "45SJY3" = "./breseq_45SJY3",
-  "45SJY5" = "./breseq_45SJY5",
-  "45SJY7" = "./breseq_45SJY7"
-)
+> **Note:** Input files must be breseq HTML output (`index.html`). For tracking cumulative mutations across ALE rounds, ensure samples are ordered chronologically (e.g., WT → R1 → R2 → R3). The comparison algorithm detects "new" mutations by sequential pairwise comparison.
+
+```r
+library(breseqConverter)
 
 # Run complete analysis
 run_breseq_analysis(
-  breseq_dirs = breseq_dirs,
-  reference_gbk = "reference.gbk",
-  eggnog_file = "eggnog_annotations.tsv",  # optional for COG colors
+  breseq_dir = "./breseq_outputs",
+  reference_gbk = "reference.gbff",       # Supports .gb, .gbff, .gbk
+  eggnog_file = "eggnog_annotations.xlsx", # Optional, for COG colors
   output_dir = "breseq_analysis",
   add_genome_map = TRUE
 )

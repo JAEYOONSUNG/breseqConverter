@@ -215,7 +215,7 @@ export_mutations_to_genbank(
 
 ### SnapGene Visualization
 
-![SnapGene Map](https://github.com/user-attachments/assets/048184e4-4ed5-45e0-9fe4-3281383ce3d1)
+<img width="792" height="768" alt="스크린샷 2026-02-06 21 02 41" src="https://github.com/user-attachments/assets/e094a335-ec2c-417b-b0e0-068eaeddd874" />
 
 ---
 
@@ -298,8 +298,7 @@ options(breseqConverter.snapgene_path = "/custom/path/to/snapgene")
 When using `export_mutations_to_genbank()` with .dna files, the function checks if SnapGene is running:
 
 ```
-⚠️  SnapGene이 실행 중입니다. CLI 변환을 위해 종료해야 할 수 있습니다.
-SnapGene을 종료할까요? [Y/n]:
+⚠️  SnapGene is active. Close application to proceed? [Y/n]:
 ```
 
 - Press Enter or `Y` to close SnapGene and proceed

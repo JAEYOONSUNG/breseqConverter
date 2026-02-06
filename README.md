@@ -2,7 +2,8 @@
 
 An R package for parsing, comparing, and visualizing genomic mutation data from [breseq](https://barricklab.org/twiki/bin/view/Lab/ToolsBacterialGenomeResequencing) output files. Designed for tracking genomic changes during bacterial strain engineering and adaptive laboratory evolution (ALE) experiments.
 
-![Circos Genome Map](https://github.com/user-attachments/assets/4107d550-f704-4bcb-9437-47bf8f9eb504)
+<img width="929" height="865" alt="image" src="https://github.com/user-attachments/assets/132092fe-64fe-4a5c-97d5-d675a02595dd" />
+
 
 ## Features
 

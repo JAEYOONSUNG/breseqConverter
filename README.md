@@ -1,70 +1,169 @@
 # breseqConverter
 
-An R package for parsing, comparing, and visualizing genomic mutation data from [breseq](https://barricklab.org/twiki/bin/view/Lab/ToolsBacterialGenomeResequencing) output files. Designed for tracking genomic changes during bacterial strain engineering and adaptive laboratory evolution (ALE) experiments.
+Parse and compare [breseq](https://barricklab.org/twiki/bin/view/Lab/ToolsBacterialGenomeResequencing) reports, draw per-sample genome maps, and reconstruct sequences with the reported mutations applied.
 
-<img width="929" height="865" alt="image" src="https://github.com/user-attachments/assets/132092fe-64fe-4a5c-97d5-d675a02595dd" />
-
+**Start with [one_shot.R](https://raw.githubusercontent.com/JAEYOONSUNG/breseqConverter/master/inst/scripts/one_shot.R).** One file creates **both Excel formats**, one PDF per replicon, and changed-sequence GenBank files. Native SnapGene `.dna` files are also created when its CLI is available. Installing the breseqConverter package is optional.
 
 ## Features
 
-- **Extract** mutation tables from breseq HTML reports
-- **Compare** genomic changes between strains or evolution time points
-- **Track** sequential mutations across multiple rounds of strain improvement
-- **Visualize** with Circos-style genome maps (COG annotations, GC content, RNA features)
-- **Export** to SnapGene-compatible GenBank format with color-coded mutations
+- Extract mutation, missing-coverage and junction tables from breseq HTML reports.
+- Compare samples in an explicit chronological order while preserving replicon identities.
+- Write a complete wide Excel workbook **and** a separate compact publication workbook.
+- Show every observed call with its stage color; use bold for new, changed or reappearing calls. Both workbooks use Arial 10 pt.
+- Plot each sample's observed variants, with optional intergenic-label hiding and configurable GC colors.
+- Apply finalized calls to the reference bases and export annotated GenBank plus conditional native SnapGene DNA files.
 
-## Installation
+## Quick Start: one file
 
-```r
-# From GitHub
-devtools::install_github("JAEYOONSUNG/breseqConverter")
-```
+Requires **R 4.1 or newer**. No external R scripts or prepared GenomeDrawer objects are needed.
 
-## Dependencies
+### 1. Install the R libraries once
 
 ```r
-# Required
-install.packages(c("rvest", "dplyr", "openxlsx"))
+install.packages(c(
+  "dplyr", "rvest", "openxlsx", "circlize", "RColorBrewer",
+  "gtools", "reshape2", "stringr"
+))
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
+  install.packages("BiocManager")
+}
+BiocManager::install("ComplexHeatmap")
 
-# For Circos visualization
-install.packages(c("circlize", "RColorBrewer", "gtools"))
-BiocManager::install(c("ComplexHeatmap", "Biostrings"))
+# For native .dna export through an installed SnapGene CLI:
+install.packages("processx")
 ```
+
+### 2. Download and run
+
+Change `input_dir` to your input folder, then run this block in R or RStudio:
+
+```r
+download.file(
+  "https://raw.githubusercontent.com/JAEYOONSUNG/breseqConverter/master/inst/scripts/one_shot.R",
+  destfile = "one_shot.R", mode = "wb"
+)
+
+options(breseqConverter.one_shot.config = list(
+  input_dir = "/path/to/breseq_outputs",
+  sample_order = NULL,       # Or c("WT", "sample1", "sample2")
+  sample_labels = NULL,      # Optional named display labels
+  hide_intergenic_labels = TRUE,
+  create_genbank = TRUE,
+  create_dna = TRUE
+))
+source("one_shot.R")
+```
+
+The script detects the reference, GFF and eggNOG files and saves a new timestamped folder on Desktop. Inputs are read only. For HTML reports, `sample_order = NULL` uses natural filename order and adds an empty WT baseline when no WT report exists. Canonical Excel input keeps its stored or detected sample order. Set an explicit order for the intended construction history. If several different references or annotation files are found, set their paths explicitly.
+
+Alternatively, download the same file, edit the settings at its top, and use Source in RStudio or run `Rscript --vanilla one_shot.R`.
+
+### Output files
+
+| Output in the results folder | Contents |
+| --- | --- |
+| `merged_mutation_results.xlsx` | Complete wide comparison with all source fields and hidden canonical-column metadata. |
+| `publication_mutation_results.xlsx` | Organized publication tables: mutations, missing coverage, junction evidence, and supplied plot-derived evidence. |
+| `plots/circos_<replicon>.pdf` | One genome plot per reference replicon; sample rings run from outside to inside in the configured order. |
+| `changed_sequences/*_called_variants.gbk` | Per-sample, per-replicon sequences with finalized mutations applied and annotations lifted to the edited coordinates. |
+| `changed_sequences/*_called_variants.dna` | Native SnapGene files after successful CLI conversion. |
+| `changed_sequences/sequence_manifest.tsv` | Sequence lengths, output paths, replicon losses and DNA-conversion status. |
+| `sample_call_counts.tsv` | Original call counts and plotted call counts, including any audited display additions. |
+| `provenance/` | Source hashes, evidence tables and the R result object. |
+
+The two Excel workbooks are always written by the one-shot workflow. Sequence files depend on `create_genbank`; DNA also requires `create_dna`, `processx` and an available SnapGene CLI. Lost replicons receive manifest entries instead of empty sequence files. SnapGene sessions that are already open are left running, with conversion status recorded in the manifest.
+
+## One-shot configuration
+
+Settings can be edited at the top of `one_shot.R`, or passed as lower-case keys through `options(breseqConverter.one_shot.config = list(...))` before sourcing it.
+
+| Setting in the file | R option-list key | Purpose / default |
+| --- | --- | --- |
+| `INPUT_DIR` | `input_dir` | Input folder; defaults to the current working directory. |
+| `OUTPUT_DIR` | `output_dir` | Defaults to a new timestamped Desktop folder; must be outside the input folder. |
+| `REFERENCE_FILE` | `reference_file` | GenBank or FASTA reference; `NULL` detects it automatically. |
+| `EXCEL_FILE` | `excel_file` | Optional canonical merged workbook input instead of HTML reports. |
+| `GFF_FILE`, `EGGNOG_FILE` | `gff_file`, `eggnog_file` | Optional annotations; `NULL` detects them automatically. |
+| `SAMPLE_ORDER` | `sample_order` | Exact sample IDs in chronological order; `NULL` uses natural filename order. |
+| `SAMPLE_LABELS` | `sample_labels` | Named ID-to-display-label map, used in both Excel files and plots. |
+| `BASELINE_ID` | `baseline_id` | For HTML input, `"WT"` adds an empty baseline when no WT report exists; `NULL` adds none. For Excel input, include a desired empty baseline in `sample_order`. |
+| `HIDE_INTERGENIC_LABELS` | `hide_intergenic_labels` | Default `FALSE`; `TRUE` hides labels only, preserving marks and data. |
+| `GC_COLORS` | `gc_colors` | Skew: green `#00FF00` / red `#FF0000`; ratio: blue `#0000FF` / yellow `#FFFF00`. |
+| `CREATE_GENBANK`, `CREATE_DNA` | `create_genbank`, `create_dna` | Both default `TRUE`; DNA conversion follows successful changed-sequence export. |
+| `SNAPGENE_PATH` | `snapgene_path` | Optional CLI path; `NULL` detects it automatically. |
+| `DISPLAY_DELETIONS_FILE` | `display_deletions_file` | Optional audited coverage-evidence TSV; otherwise auto-detect `coverage_derived_DEL_rows.tsv`. |
+| `SAMPLE_ALIASES` | `sample_aliases` | Optional mapping from evidence-file IDs to exact sample IDs. |
+| `PUBLICATION_ANNOTATIONS_FILE` | `publication_annotation_overrides` | Optional TSV of publication-only annotation labels. |
+
+HTML reports may be named `index_<sample>.html`, or stored as `<sample>/output/index.html`. Use the extracted IDs in `sample_order` and the names of `sample_labels`; display-label values can be different. Canonical Excel files produced by the converter are also supported. FASTA supplies bases but no gene features; use GenBank or a GFF when gene annotations are needed.
+
+## One-shot Excel and sequence details
+
+Every one-shot run writes both Excel files to the output folder:
+
+- `merged_mutation_results.xlsx` retains the complete wide comparison, all
+  reported fields and hidden canonical column metadata for reloading.
+- `publication_mutation_results.xlsx` presents one row per variant or evidence
+  region with compact stage columns. It separates mutations, missing coverage,
+  paired junction evidence and, when supplied, plot-derived evidence. Gene and
+  product annotations come from the supplied reference or GFF. Missing coverage
+  wholly inside a previously called deletion is omitted from the compact view;
+  every source row remains in the wide workbook.
+
+Both use Arial 10 pt. Reported calls remain shaded in each observed stage;
+new or changed calls use bold text. Unreported calls are never filled forward.
+Use `SAMPLE_LABELS` to set the displayed strain names in both files. The returned
+R result includes `excel_files`, with `comparison` and `publication` paths;
+`excel_file` continues to refer to the wide workbook.
+
+Optional publication-only labels can be supplied in
+`PUBLICATION_ANNOTATIONS_FILE`, a tab-separated file with columns `sheet`,
+`seq_id`, `position`, `field` and `value`. Use the reference accession and the
+mutation position, a source start interval for missing coverage, or the displayed
+start coordinate for plot-derived evidence. Only
+annotation fields can be overridden; sample calls remain the original data.
+The source comparison, plots and reconstructed sequences are unaffected.
+
+For other datasets, change `INPUT_DIR` and set `SAMPLE_ORDER`, `SAMPLE_LABELS`,
+and `SAMPLE_ALIASES` to `NULL` for automatic sample IDs. Set `BASELINE_ID` to
+`NULL` when a reference baseline should not be added. `one_shot_legacy.R`
+preserves the former script that requires prepared GenomeDrawer objects.
+
+Sequence export settings are `CREATE_GENBANK = TRUE` and `CREATE_DNA = TRUE`.
+Finalized SNPs, insertions, deletions, replacements and exact tandem-repeat
+changes are applied to each sample's reference sequence. Features are lifted
+to the edited coordinates, and affected coding annotations are reviewed or
+retranslated. Invalid reference alleles, unsupported calls and overlapping
+edits stop export with an edit report rather than silently making a sequence.
+
+Each retained sample/replicon produces a `*_called_variants.gbk` under
+`changed_sequences/`, plus `.dna` after successful SnapGene conversion.
+`sequence_manifest.tsv` records exported files, lengths, losses and conversion
+statuses. A finalized whole-replicon deletion produces a loss record instead
+of an empty DNA file. Audited whole-replicon coverage loss is recorded
+separately as `lost_by_coverage`. Unassigned MC boundaries are not exact
+deletion breakpoints: these intervals go into `unresolved_coverage_regions.tsv`
+and are not silently removed from the reconstructed sequence.
+
+SnapGene must be installed and not already running for its documented CLI.
+If it is open, unavailable or delayed, the GenBank files remain usable and the
+manifest records the conversion status; the workflow never quits the app.
+
+Developers can regenerate the entry point with `Rscript tools/build_standalone.R`.
 
 ---
 
-## Quick Start
+## Optional R package installation
 
-### Full Pipeline with Circos Visualization
-
-Input files must be breseq HTML reports (`index.html`). Supply `sample_order`
-when the intended chronological order differs from the file names.
+The one-shot workflow above does not require installing breseqConverter. For individual R API calls in the following sections:
 
 ```r
+install.packages("remotes")
+remotes::install_github("JAEYOONSUNG/breseqConverter")
 library(breseqConverter)
-
-# Run complete analysis
-run_full_analysis(
-  input_dir = "./breseq_outputs",
-  reference_file = "reference.gbff",      # Supports .gb, .gbff, .gbk
-  eggnog_file = "eggnog_annotations.xlsx", # Optional, for COG colors
-  output_dir = "breseq_analysis",
-  add_genome_map = TRUE
-)
-
-# Export to SnapGene
-export_mutations_to_genbank(
-  reference_file = "reference.dna"
-  # Auto-detects breseq_analysis/merged_mutation_results.xlsx
-)
 ```
 
-**Output files:**
-- `breseq_analysis/merged_mutation_results.xlsx` — Combined mutation data
-- `breseq_analysis/circos_plot.pdf` — Circos genome visualization
-- `breseq_analysis/<reference>_with_mutations.gbk` — SnapGene-compatible GenBank
-
----
+`run_full_analysis()` and `run_breseq_pipeline()` retain their existing API behavior. Use the one-shot workflow to create both Excel workbooks, per-replicon plots and changed sequences automatically, or call the export helpers explicitly.
 
 ## Core Functions
 
@@ -93,8 +192,8 @@ comparison <- compare_named_tables(strain_A, strain_B)
 ```
 
 **Status values:**
-- `New in B` — Mutations acquired in strain B
-- `Missing in B` — Mutations lost in strain B
+- `New in B` — Call reported in B and absent from A
+- `Missing in B` — Call absent from B; this alone does not establish reversion
 - `Unchanged or Modified` — Mutations present in both
 
 ### `compare_multiple_tables()`
@@ -109,6 +208,8 @@ all_comparisons <- compare_multiple_tables(lineage)
 ---
 
 ## Circos Visualization
+
+<img width="929" height="865" alt="image" src="https://github.com/user-attachments/assets/132092fe-64fe-4a5c-97d5-d675a02595dd" />
 
 ### `run_full_analysis()`
 
@@ -205,108 +306,6 @@ gc_colors <- c(
 The four values above match the legacy GenomeDrawer palette. Partial overrides
 are accepted. The intergenic label setting is independent of these colors.
 
-### Standalone script
-
-Download [`one_shot.R`](https://raw.githubusercontent.com/JAEYOONSUNG/breseqConverter/master/inst/scripts/one_shot.R)
-for a self-contained entry point. It includes the converter implementation and
-automatically reads the inputs, prepares genome annotations, exports two
-workbooks, plots every replicon, and reconstructs changed GenBank sequences.
-When SnapGene's CLI is available it also creates native `.dna` files. It requires the
-listed R libraries, but no breseqConverter installation, external R scripts,
-GenomeDrawer objects, or separate drawing call.
-
-Edit the paths and settings at the top, then use Source in RStudio or run:
-
-```sh
-Rscript --vanilla one_shot.R
-```
-
-Set `INPUT_DIR` to your data folder. The defaults detect sample IDs, add an
-empty `WT` reference baseline, and write a new output folder on Desktop. Supply
-`SAMPLE_ORDER` when natural filename order differs from the intended chronology.
-Two display settings are:
-
-```r
-HIDE_INTERGENIC_LABELS <- TRUE  # FALSE displays the labels
-GC_COLORS <- c(
-  skew_positive = "#00FF00", skew_negative = "#FF0000",
-  ratio_positive = "#0000FF", ratio_negative = "#FFFF00"
-)
-```
-
-Each ring contains its sample's observed calls, including retained mutations.
-The configured sample order runs from outside to inside. Reference GenBank or
-FASTA, GFF and eggNOG inputs can be detected automatically or supplied explicitly.
-Canonical merged Excel inputs are also supported. Audited coverage display
-evidence is loaded from `coverage_derived_DEL_rows.tsv` when available, kept
-separate from the original calls, and copied into output provenance. The
-converter does not infer missing coverage values from unavailable summary files.
-
-Every one-shot run writes both Excel files to the output folder:
-
-- `merged_mutation_results.xlsx` retains the complete wide comparison, all
-  reported fields and hidden canonical column metadata for reloading.
-- `publication_mutation_results.xlsx` presents one row per variant or evidence
-  region with compact stage columns. It separates mutations, missing coverage,
-  paired junction evidence and, when supplied, plot-derived evidence. Gene and
-  product annotations come from the supplied reference or GFF. Missing coverage
-  wholly inside a previously called deletion is omitted from the compact view;
-  every source row remains in the wide workbook.
-
-Both use Arial 10 pt. Reported calls remain shaded in each observed stage;
-new or changed calls use bold text. Unreported calls are never filled forward.
-Use `SAMPLE_LABELS` to set the displayed strain names in both files. The returned
-R result includes `excel_files`, with `comparison` and `publication` paths;
-`excel_file` continues to refer to the wide workbook.
-
-Optional publication-only labels can be supplied in
-`PUBLICATION_ANNOTATIONS_FILE`, a tab-separated file with columns `sheet`,
-`seq_id`, `position`, `field` and `value`. Use the reference accession and the
-mutation position, a source start interval for missing coverage, or the displayed
-start coordinate for plot-derived evidence. Only
-annotation fields can be overridden; sample calls remain the original data.
-The source comparison, plots and reconstructed sequences are unaffected.
-
-For an existing native merged comparison, the compact file is also available
-without running the plots or sequence export:
-
-```r
-save_publication_results_to_excel(
-  merged_results, "publication_mutation_results.xlsx",
-  sample_order = sample_ids,
-  sample_labels = c(WT = "Parent", sample1 = "Strain 1",
-                    sample2 = "Strain 2", sample3 = "Final strain"),
-  reference_file = "reference.gbk"
-)
-```
-
-For other datasets, change `INPUT_DIR` and set `SAMPLE_ORDER`, `SAMPLE_LABELS`,
-and `SAMPLE_ALIASES` to `NULL` for automatic sample IDs. Set `BASELINE_ID` to
-`NULL` when a reference baseline should not be added. `one_shot_legacy.R`
-preserves the former script that requires prepared GenomeDrawer objects.
-
-Sequence export settings are `CREATE_GENBANK = TRUE` and `CREATE_DNA = TRUE`.
-Finalized SNPs, insertions, deletions, replacements and exact tandem-repeat
-changes are applied to each sample's reference sequence. Features are lifted
-to the edited coordinates, and affected coding annotations are reviewed or
-retranslated. Invalid reference alleles, unsupported calls and overlapping
-edits stop export with an edit report rather than silently making a sequence.
-
-Each retained sample/replicon produces a `*_called_variants.gbk` under
-`changed_sequences/`, plus `.dna` after successful SnapGene conversion.
-`sequence_manifest.tsv` records exported files, lengths, losses and conversion
-statuses. A finalized whole-replicon deletion produces a loss record instead
-of an empty DNA file. Audited whole-replicon coverage loss is recorded
-separately as `lost_by_coverage`. Unassigned MC boundaries are not exact
-deletion breakpoints: these intervals go into `unresolved_coverage_regions.tsv`
-and are not silently removed from the reconstructed sequence.
-
-SnapGene must be installed and not already running for its documented CLI.
-If it is open, unavailable or delayed, the GenBank files remain usable and the
-manifest records the conversion status; the workflow never quits the app.
-
-Developers can regenerate the entry point with `Rscript tools/build_standalone.R`.
-
 ### Mutation Color Scheme
 
 | Type | Color | Hex Code |
@@ -369,7 +368,7 @@ export_mutations_to_genbank(
 
 - **Auto-detection** — Finds `breseq_analysis/merged_mutation_results.xlsx` automatically
 - **SnapGene .dna support** — Converts .dna files via SnapGene CLI
-- **Process check** — Prompts to close SnapGene if running (required for CLI conversion)
+- **Legacy process check** — The reference-annotation API can prompt to close SnapGene for CLI conversion; the one-shot workflow does not close it.
 - **CONTIG removal** — Fixes SnapGene compatibility issues
 - **ApE color format** — Colors visible in SnapGene
 
@@ -406,52 +405,25 @@ export_mutations_to_genbank(
 
 ---
 
-## Complete Workflow Example
+## One-shot example: explicit stage order
 
-### Tracking Mutations Across ALE Rounds
-
-```r
-library(breseqConverter)
-
-# Place each sample's breseq report under this input directory.
-run_full_analysis(
-  input_dir = "./breseq_output",
-  reference_file = "GCB.gbk",
-  eggnog_file = "GCB_eggnog.tsv",
-  output_dir = "breseq_analysis",
-  add_genome_map = TRUE,
-  sample_order = c("WT", "45SJY3", "45SJY5", "45SJY7")
-)
-
-# Step 3: Export to SnapGene
-export_mutations_to_genbank(
-  reference_file = "GCB.dna",
-  color_by = "type"
-)
-
-# Generated files:
-# - breseq_analysis/merged_mutation_results.xlsx
-# - breseq_analysis/circos_plot.pdf
-# - breseq_analysis/GCB_with_mutations.gbk
-```
-
-### Step-by-Step Usage
+After downloading `one_shot.R`, this runs extraction, both Excel exports, all replicon plots and changed-sequence export in one call:
 
 ```r
-# 1. Extract tables from breseq HTML output
-extract_named_tables(directory = "path/to/breseq/output")
+options(breseqConverter.one_shot.config = list(
+  input_dir = "/path/to/breseq_outputs",
+  sample_order = c("WT", "sample1", "sample2", "sample3"),
+  sample_labels = c(WT = "Parent", sample1 = "Strain 1",
+                    sample2 = "Strain 2", sample3 = "Final strain"),
+  hide_intergenic_labels = TRUE,
+  create_genbank = TRUE,
+  create_dna = TRUE
+))
+source("one_shot.R")
 
-# 2. Compare two strains
-comparison <- compare_named_tables(strain_A, strain_B)
-
-# 3. Save results to Excel
-save_comparison_results_to_excel(comparison, "comparison_results.xlsx")
-
-# 4. Export to SnapGene
-export_mutations_to_genbank(
-  reference_file = "reference.gbk",
-  mutation_xlsx = "comparison_results.xlsx"
-)
+ONE_SHOT_RESULTS$excel_files  # comparison and publication paths
+ONE_SHOT_RESULTS$plots        # one PDF per replicon
+ONE_SHOT_RESULTS$genome_export$manifest
 ```
 
 ---
@@ -473,9 +445,9 @@ options(breseqConverter.snapgene_path = "/custom/path/to/snapgene")
 - **Windows**: `C:\Program Files\SnapGene\snapgene.exe`
 - **Linux**: `/usr/bin/snapgene`, `/opt/snapgene/snapgene`
 
-### SnapGene Process Check
+### SnapGene process check in the legacy annotation exporter
 
-When using `export_mutations_to_genbank()` with .dna files, the function checks if SnapGene is running:
+The one-shot workflow leaves running SnapGene sessions untouched and records a skipped or pending conversion. The older `export_mutations_to_genbank()` API has a separate interactive process check when using `.dna` input:
 
 ```
 ⚠️  SnapGene is active. Close application to proceed? [Y/n]:
@@ -517,6 +489,21 @@ Exports comparison results to a multi-sheet Excel workbook.
 save_comparison_results_to_excel(comparison, "output.xlsx")
 ```
 
+### `save_publication_results_to_excel()`
+
+For an existing native merged comparison, the compact file is also available
+without running the plots or sequence export:
+
+```r
+save_publication_results_to_excel(
+  merged_results, "publication_mutation_results.xlsx",
+  sample_order = sample_ids,
+  sample_labels = c(WT = "Parent", sample1 = "Strain 1",
+                    sample2 = "Strain 2", sample3 = "Final strain"),
+  reference_file = "reference.gbk"
+)
+```
+
 ### `get_screen_size()`
 
 Helper function for adaptive plot sizing (macOS).
@@ -529,12 +516,12 @@ dims <- get_screen_size(default_width = 12, default_height = 7, dpi = 96)
 
 ## Notes
 
-- Input files must be breseq HTML output (`index.html`)
-- Comparison is based on genomic `position` column
-- For Missing Coverage, comparison uses `start` column
-- Excel sheet names are truncated to 31 characters (Excel limitation)
-- SnapGene must be closed when converting .dna files
-- Numbers with commas (e.g., `Δ13,543 bp`) are parsed correctly
+- The one-shot workflow accepts breseq HTML reports or canonical merged Excel inputs.
+- Comparisons retain reference replicon identities as well as coordinates; junction events use both oriented endpoints when paired keys are available.
+- A missing call is not evidence that a previously deleted sequence or plasmid has returned. No call is carried forward without a report in that sample.
+- Unassigned missing coverage and junctions remain evidence. Audited display additions are listed separately from finalized calls and reconstructed sequence edits.
+- Intergenic-label hiding changes only labels, and does not establish that those variants have no functional effect.
+- Excel sheet names are limited to 31 characters. Comma-formatted mutation lengths such as `Δ13,543 bp` are supported.
 
 ---
 

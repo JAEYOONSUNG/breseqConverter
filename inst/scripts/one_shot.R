@@ -7912,7 +7912,11 @@ export_changed_sequences_to_genbank <- function(reference_file, mutation_list, o
   }
   openxlsx::saveWorkbook(wb, excel_out, overwrite = TRUE)
   processed <- process_mutation_data_for_viz(mutation_data, sample_order = order)
-  calls <- processed$mutation_list
+  # A workbook may retain region annotations in a sample with no variant call.
+  # Annotation/replicon metadata alone must not become an UNKNOWN mutation.
+  calls <- lapply(processed$mutation_list, function(d) {
+    d[.breseq_present(.breseq_text(d$mutation)), , drop = FALSE]
+  })
   raw_calls <- calls
   raw_counts <- setNames(vapply(order, function(s) if (is.null(calls[[s]])) 0L else nrow(calls[[s]]), integer(1)), order)
 

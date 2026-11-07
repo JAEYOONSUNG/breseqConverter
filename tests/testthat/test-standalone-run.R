@@ -8,12 +8,13 @@ test_that("one-file driver runs without pre-existing genome objects", {
   writeLines(c(">chr circular", paste(rep("ACGT", 5000), collapse = ""),
                ">plasmid circular", paste(rep("GGCA", 2000), collapse = "")),
              file.path(input, "reference.fasta"))
-  mutation <- data.frame(seq_id = c("chr", "plasmid"), position = c(10, 20),
+  mutation <- data.frame(seq_id = c("chr", "plasmid", "chr"), position = c(10, 20, 30),
                          check.names = FALSE)
   for (s in c("A", "B")) {
-    mutation[[paste0("seq id.", s, "/output/index")]] <- c("chr", "plasmid")
-    mutation[[paste0("mutation.", s, "/output/index")]] <- c("C\u2192G", "\u039410 bp")
-    mutation[[paste0("annotation.", s, "/output/index")]] <- c("intergenic (+1/-2)", "coding")
+    mutation[[paste0("seq id.", s, "/output/index")]] <- c("chr", "plasmid", "chr")
+    mutation[[paste0("mutation.", s, "/output/index")]] <-
+      c("C\u2192G", "\u039410 bp", if (s == "A") NA_character_ else "+T")
+    mutation[[paste0("annotation.", s, "/output/index")]] <- c("intergenic (+1/-2)", "coding", "coding")
   }
   file <- file.path(input, "merged_mutation_results.xlsx")
   openxlsx::write.xlsx(list(Mutations = mutation), file)
@@ -32,15 +33,15 @@ test_that("one-file driver runs without pre-existing genome objects", {
   expect_true(all(file.exists(result$plots)))
   expect_true(all(file.info(result$plots)$size > 0))
   expect_true(file.exists(result$excel_file))
-  expect_identical(result$counts$raw_calls, c(0L, 2L, 2L))
+  expect_identical(result$counts$raw_calls, c(0L, 2L, 3L))
   expect_identical(result$counts$plot_calls, result$counts$raw_calls)
   expect_equal(nrow(result$genome_export$manifest), 6L)
   expect_true(all(file.exists(result$genome_export$manifest$genbank_file)))
   expect_equal(result$genome_export$manifest$new_length,
-               c(20000, 8000, 20000, 7990, 20000, 7990))
+               c(20000, 8000, 20000, 7990, 20001, 7990))
   expect_true(all(result$genome_export$manifest$dna_status == "not_requested"))
   edits <- result$genome_export$edits
-  expect_equal(sum(edits$ref_length - edits$alt_length), 20)
+  expect_equal(sum(edits$ref_length - edits$alt_length), 19)
   expect_identical(before, tools::md5sum(names(before)))
   expect_false(file.exists(file.path(input, "plots")))
   cfg$output_dir <- file.path(input, "forbidden-output")

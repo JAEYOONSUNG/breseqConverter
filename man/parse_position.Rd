@@ -15,4 +15,6 @@ List with start and end positions, or single position if not a range
 \description{
 Parses various position formats from breseq HTML output.
 Handles formats like: "1234", "1,234", "1234-5678", "1234–5678" (en-dash)
+and oriented junction endpoints such as "= 1234" or "1234 =".
+Only the returned coordinates omit orientation markers; reported inputs are unchanged.
 }

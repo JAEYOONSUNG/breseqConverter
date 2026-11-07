@@ -7,7 +7,9 @@
 breseqVisualization(
   fna_count = NULL,
   completeness = NULL,
-  mutation_data = NULL
+  mutation_data = NULL,
+  hide_intergenic_labels = FALSE,
+  gc_colors = NULL
 )
 }
 \arguments{
@@ -16,6 +18,14 @@ breseqVisualization(
 \item{completeness}{Logical indicating if the genome is complete. If TRUE, saves output as PDF after interactive display.}
 
 \item{mutation_data}{A data frame with mutation data (columns: start, end, type, color, ALE_version; or position, mutation, color, ALE_version for raw data).}
+
+\item{hide_intergenic_labels}{Hide labels whose annotation starts with
+"intergenic" after whitespace normalization (default: FALSE). Mutation marks and data are retained.}
+
+\item{gc_colors}{Optional named GC palette overrides: \code{skew_positive},
+\code{skew_negative}, \code{ratio_positive}, and \code{ratio_negative}.
+Defaults are green/red for GC skew and blue/yellow for GC ratio. Signs refer
+to deviations from the existing average, and cached color columns are ignored.}
 }
 \value{
 A genome map displayed interactively in the plot window, with optional PDF output.

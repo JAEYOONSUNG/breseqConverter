@@ -4,10 +4,13 @@
 \alias{process_mutation_data_for_viz}
 \title{Process Mutation Data for Visualization}
 \usage{
-process_mutation_data_for_viz(mutation_data)
+process_mutation_data_for_viz(mutation_data, sample_order = NULL)
 }
 \arguments{
 \item{mutation_data}{List from load_mutation_excel()}
+
+\item{sample_order}{Optional sample IDs in analysis order. Saved Excel metadata
+supplies the order when this argument is NULL.}
 }
 \value{
 List with mutation_list, missing_data, and samples

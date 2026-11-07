@@ -103,8 +103,8 @@ get_stage_color <- function(stage_index, total_stages, base_hue = 300) {
 #'
 #' @param mutation_type Mutation type (INS, DEL, SNP, REP, UNKNOWN)
 #' @return Hex color code
-#' @export
-get_mutation_color <- function(mutation_type) {
+#' @keywords internal
+.get_genbank_mutation_color <- function(mutation_type) {
   colors <- c(
     "INS" = "#FF5C8D",   # Bright Pink
     "DEL" = "#03045E",   # Dark Navy
@@ -112,7 +112,9 @@ get_mutation_color <- function(mutation_type) {
     "REP" = "#E5C87B",   # Golden Yellow
     "UNKNOWN" = "#808080", # Gray
     "insertion" = "#FF5C8D",
+    "large_insertion" = "#FF5C8D",
     "deletion" = "#03045E",
+    "large_deletion" = "#03045E",
     "snp" = "#139487",
     "replacement" = "#E5C87B",
     "unknown" = "#808080"
@@ -137,8 +139,8 @@ get_mutation_color <- function(mutation_type) {
 #'
 #' @param mutation Mutation string from breseq
 #' @return Mutation type as string
-#' @export
-classify_mutation <- function(mutation) {
+#' @keywords internal
+.classify_genbank_mutation <- function(mutation) {
   if (is.na(mutation) || is.null(mutation) || nchar(as.character(mutation)) == 0) {
     return("UNKNOWN")
   }
@@ -300,7 +302,7 @@ format_number_with_commas <- function(x) {
 #' @param position Position value from breseq
 #' @param mutation Mutation string (for calculating deletion size, etc.)
 #' @param end_position Optional explicit end position
-#' @param mutation_type Type of mutation (from classify_mutation)
+#' @param mutation_type Type of mutation (from .classify_genbank_mutation)
 #' @return List with start and end positions
 #' @export
 parse_mutation_range <- function(position, mutation = NULL,
@@ -450,7 +452,9 @@ create_annotated_genbank <- function(reference_file,
     }
     mutation_list <- lapply(sheets, function(sheet) {
       tryCatch(
-        openxlsx::read.xlsx(mutation_data, sheet = sheet),
+        restore_canonical_export_headers(mutation_data, sheet,
+          openxlsx::read.xlsx(mutation_data, sheet = sheet, check.names = FALSE,
+                             skipEmptyCols = FALSE)),
         error = function(e) NULL
       )
     })
@@ -558,10 +562,10 @@ create_annotated_genbank <- function(reference_file,
       if ("mutation_type" %in% names(row)) {
         mut_type <- as.character(row[["mutation_type"]])
         if (is.na(mut_type) || nchar(mut_type) == 0) {
-          mut_type <- if (!is.na(mutation)) classify_mutation(mutation) else "unknown"
+          mut_type <- if (!is.na(mutation)) .classify_genbank_mutation(mutation) else "unknown"
         }
       } else {
-        mut_type <- if (!is.na(mutation)) classify_mutation(mutation) else "unknown"
+        mut_type <- if (!is.na(mutation)) .classify_genbank_mutation(mutation) else "unknown"
       }
 
       # Handle Missing sheet (end position)
@@ -591,7 +595,7 @@ create_annotated_genbank <- function(reference_file,
         if (is.na(stage_idx)) stage_idx <- 1
         color <- get_stage_color(stage_idx - 1, length(stage_names))
       } else {
-        color <- get_mutation_color(mut_type)
+        color <- .get_genbank_mutation_color(mut_type)
       }
 
       # Add feature for each range
@@ -830,7 +834,9 @@ export_mutations_to_genbank <- function(reference_file,
 
   mutation_list <- lapply(sheets, function(sheet) {
     tryCatch(
-      openxlsx::read.xlsx(mutation_xlsx, sheet = sheet),
+      restore_canonical_export_headers(mutation_xlsx, sheet,
+        openxlsx::read.xlsx(mutation_xlsx, sheet = sheet, check.names = FALSE,
+                           skipEmptyCols = FALSE)),
       error = function(e) {
         message("  Sheet '", sheet, "' not found, skipping...")
         NULL
@@ -918,7 +924,7 @@ export_mutations_to_genbank <- function(reference_file,
       }
 
       # Classify mutation type
-      mut_type <- classify_mutation(mutation)
+      mut_type <- .classify_genbank_mutation(mutation)
 
       # Calculate end position
       end_position <- position
@@ -955,13 +961,13 @@ export_mutations_to_genbank <- function(reference_file,
 
       # Determine color
       if (color_by == "type") {
-        color <- get_mutation_color(mut_type)
+        color <- .get_genbank_mutation_color(mut_type)
       } else if (!is.na(first_stage) && length(stage_names) > 0) {
         stage_idx <- match(first_stage, stage_names)
         if (is.na(stage_idx)) stage_idx <- 1
         color <- get_stage_color(stage_idx - 1, length(stage_names))
       } else {
-        color <- get_mutation_color(mut_type)
+        color <- .get_genbank_mutation_color(mut_type)
       }
 
       # Create label with stage visible

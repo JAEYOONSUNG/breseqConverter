@@ -3,11 +3,19 @@
 #' @param fna_count Number of contigs to process. If NULL, uses the number of rows in contig_length.
 #' @param completeness Logical indicating if the genome is complete. If TRUE, saves output as PDF after interactive display.
 #' @param mutation_data A data frame with mutation data (columns: start, end, type, color, ALE_version; or position, mutation, color, ALE_version for raw data).
+#' @param hide_intergenic_labels Hide labels whose annotation starts with
+#'   "intergenic" (default: FALSE). Mutation marks and data are retained.
+#' @param gc_colors Optional named GC palette overrides: skew_positive,
+#'   skew_negative, ratio_positive, and ratio_negative. Defaults are green/red
+#'   for GC skew and blue/yellow for GC ratio. Signs refer to deviations from
+#'   the existing average, and cached color columns are ignored.
 #' @return A genome map displayed interactively in the plot window, with optional PDF output.
 #' @export
 
 
-breseqVisualization <- function(fna_count = NULL, completeness = NULL, mutation_data = NULL) {
+breseqVisualization <- function(fna_count = NULL, completeness = NULL, mutation_data = NULL,
+                                hide_intergenic_labels = FALSE, gc_colors = NULL) {
+  gc_palette <- .breseq_gc_colors(gc_colors)
   # Load required packages
   library(circlize)
   library(dplyr)
@@ -211,7 +219,8 @@ breseqVisualization <- function(fna_count = NULL, completeness = NULL, mutation_
       # Add labels for mutations with non-empty label column
       if ("label" %in% colnames(mut_data) && any(!is.na(mut_data$label) & mut_data$label != "")) {
         label_data <- mut_data %>%
-          dplyr::filter(!is.na(label) & label != "") %>%
+          dplyr::filter(!is.na(label) & label != "")
+        label_data <- .breseq_filter_intergenic_labels(label_data, hide_intergenic_labels) %>%
           dplyr::select(seqid, start, end, label, version_color)
         if (nrow(label_data) > 0) {
           message("Adding labels for ", nrow(label_data), " mutations")
@@ -383,10 +392,14 @@ breseqVisualization <- function(fna_count = NULL, completeness = NULL, mutation_
                                  panel.fun = function(x,y) { # x and y are implicit here for the current sector
                                    current_sector_data <- gc_data[gc_data$seqid == circlize::get.cell.meta.data("sector.index"),]
                                    if(nrow(current_sector_data) > 0){
+                                     gc_values <- as.numeric(current_sector_data[[paste0(type, "_minus_average")]])
+                                     palette_prefix <- if (type == "gc_skew") "skew" else "ratio"
                                      circlize::circos.barplot(
-                                       value = current_sector_data[[paste0(type, "_minus_average")]] %>% as.numeric(),
+                                       value = gc_values,
                                        pos = (current_sector_data$start + current_sector_data$end) / 2,
-                                       col = current_sector_data[[paste0(type, "_color")]],
+                                       col = ifelse(gc_values >= 0,
+                                         gc_palette[[paste0(palette_prefix, "_positive")]],
+                                         gc_palette[[paste0(palette_prefix, "_negative")]]),
                                        border = NA,
                                        bar_width = 10000 # bar_width might need adjustment based on data scale
                                      )

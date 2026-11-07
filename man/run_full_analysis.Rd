@@ -13,7 +13,13 @@ run_full_analysis(
   eggnog_file = NULL,
   add_genome_map = NULL,
   create_circos = TRUE,
-  create_genbank = TRUE
+  create_genbank = TRUE,
+  hide_intergenic_labels = FALSE,
+  highlight_new = FALSE,
+  clean_headers = FALSE,
+  sample_labels = NULL,
+  sample_order = NULL,
+  gc_colors = NULL
 )
 }
 \arguments{
@@ -34,6 +40,30 @@ run_full_analysis(
 \item{create_circos}{Create Circos-style circular genome map (default: TRUE)}
 
 \item{create_genbank}{Create annotated GenBank file for SnapGene (default: TRUE)}
+
+\item{hide_intergenic_labels}{Hide intergenic annotation labels in Circos plots
+without removing mutation marks or data (default: FALSE).}
+
+\item{highlight_new}{Fill every observed stage call with a pale stage color,
+including retained calls; use bold for newly reported calls, changed alleles, and
+reappearances. Missing-coverage boundary updates and evidence in a prior deletion
+region are not bold. Default FALSE; these statuses do not imply de novo mutation.
+Either presentation option uses Arial 10 with bold dark-gray headers on white.}
+
+\item{clean_headers}{Use concise Excel column headers (default: FALSE).}
+
+\item{sample_labels}{Optional named vector mapping sample IDs to display labels
+in Excel exports.}
+
+\item{sample_order}{Optional sample IDs in analysis order. When NULL, an order
+saved in Excel metadata is used, otherwise samples are naturally sorted.}
+
+\item{gc_colors}{Optional named character vector overriding any of
+\code{skew_positive}, \code{skew_negative}, \code{ratio_positive}, and
+\code{ratio_negative}. Defaults are green/red (\code{#00FF00}/\code{#FF0000})
+for GC skew and blue/yellow (\code{#0000FF}/\code{#FFFF00}) for GC ratio.
+Colors follow the sign of deviation from the window mean; zero uses the
+positive color. The palette is passed to both calculation and rendering.}
 }
 \value{
 List containing all results and file paths

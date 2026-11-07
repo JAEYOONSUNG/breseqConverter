@@ -9,7 +9,7 @@
 #' @export
 #' @examples
 #' classify_mutation("A→G")           # "SNP"
-#' classify_mutation("Δ500 bp")       # "deletion"
+#' classify_mutation("Δ500 bp")       # "large_deletion"
 #' classify_mutation("+ATCG")         # "insertion"
 #' classify_mutation("(G)8→9")        # "insertion"  (repeat expansion)
 #' classify_mutation("(G)9→8")        # "deletion"   (repeat contraction)
@@ -30,7 +30,7 @@ classify_mutation <- function(mutation_string, annotation = NULL) {
   # Large deletion (Δ notation)
   if (grepl("^Δ|Δ\\d+", mut)) {
     # Extract size if available
-    size_match <- regmatches(mut, regexpr("\\d+", mut))
+    size_match <- regmatches(mut, regexpr("[0-9][0-9,]*", mut))
     if (length(size_match) > 0) {
       size <- as.numeric(gsub(",", "", size_match[1]))
       if (size >= 50) return("large_deletion")
@@ -166,6 +166,9 @@ get_mutation_color <- function(mutation_type) {
 #' Add Mutation Type Column to Data Frame
 #'
 #' Adds a 'mutation_type' column to a data frame containing mutation data.
+#' When the requested mutation column is absent, the first non-empty canonical
+#' stage mutation column in each row supplies its classification. Source columns
+#' are retained, including later allele changes.
 #'
 #' @param df Data frame with a 'mutation' column
 #' @param mutation_col Name of the column containing mutation strings
@@ -174,20 +177,36 @@ get_mutation_color <- function(mutation_type) {
 #' @export
 add_mutation_types <- function(df, mutation_col = "mutation", annotation_col = "annotation") {
 
+  mutation_cols <- mutation_col
   if (!mutation_col %in% names(df)) {
     # Try to find mutation column
-    mut_cols <- grep("mutation|mut\\.", names(df), value = TRUE, ignore.case = TRUE)
+    mut_cols <- grep("^(mutation|mut)\\.", names(df), value = TRUE, ignore.case = TRUE)
     if (length(mut_cols) > 0) {
-      mutation_col <- mut_cols[1]
+      mutation_cols <- mut_cols
     } else {
       warning("No mutation column found. Returning original data frame.")
       return(df)
     }
   }
 
-  annotations <- if (annotation_col %in% names(df)) df[[annotation_col]] else NULL
+  mutations <- rep(NA_character_, nrow(df))
+  annotations <- rep(NA_character_, nrow(df))
+  for (col in mutation_cols) {
+    values <- as.character(df[[col]])
+    missing <- is.na(mutations) | !nzchar(trimws(mutations))
+    available <- !is.na(values) & nzchar(trimws(values)) &
+      !tolower(trimws(values)) %in% c("na", "nan")
+    take <- missing & available
+    mutations[take] <- values[take]
+    matching_annotation <- sub("^(mutation|mut)([.]|$)", paste0(annotation_col, "\\2"), col)
+    if (matching_annotation %in% names(df)) {
+      annotations[take] <- as.character(df[[matching_annotation]])[take]
+    } else if (annotation_col %in% names(df)) {
+      annotations[take] <- as.character(df[[annotation_col]])[take]
+    }
+  }
 
-  df$mutation_type <- classify_mutations(df[[mutation_col]], annotations)
+  df$mutation_type <- classify_mutations(mutations, annotations)
   df$mutation_color <- sapply(df$mutation_type, get_mutation_color)
 
   return(df)

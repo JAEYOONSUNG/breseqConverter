@@ -4,12 +4,22 @@
 \alias{save_merged_results_to_excel}
 \title{Save Merged Results to Excel}
 \usage{
-save_merged_results_to_excel(merged_results, output_file)
+save_merged_results_to_excel(merged_results, output_file,
+  highlight_new = FALSE, clean_headers = FALSE,
+  sample_labels = NULL, sample_order = NULL)
 }
 \arguments{
 \item{merged_results}{Named list of data frames}
 
 \item{output_file}{Path to output Excel file}
+\item{highlight_new}{Fill every observed stage call with a pale stage color,
+including retained calls; use bold for newly reported calls, changed alleles, and
+reappearances. Missing-coverage boundary updates and evidence in a prior deletion
+region are not bold. Default FALSE; these statuses do not imply de novo mutation.
+Either presentation option uses Arial 10 with bold dark-gray headers on white.}
+\item{clean_headers}{Use readable headers and hidden canonical-column metadata. Default FALSE.}
+\item{sample_labels}{Named sample-ID to display-label map, used only with clean_headers=TRUE.}
+\item{sample_order}{Optional exact chronological sample order.}
 }
 \description{
 Saves merged comparison results to a multi-sheet Excel file.

@@ -10,6 +10,8 @@
 #' @param samples Sample/stage names in order (auto-detected if NULL)
 #' @param genome_length Optional genome length (auto-detected from reference if NULL)
 #' @param seqid Sequence ID for the genome (auto-detected if NULL)
+#' @param hide_intergenic_labels Hide labels whose annotation starts with
+#'   "intergenic" (default: FALSE). Mutation marks and data are retained.
 #' @return Path to the created PDF file
 #' @export
 #' @examples
@@ -27,7 +29,8 @@ plot_circos_genome <- function(mutation_data,
                                output_file = "genome_map.pdf",
                                samples = NULL,
                                genome_length = NULL,
-                               seqid = NULL) {
+                               seqid = NULL,
+                               hide_intergenic_labels = FALSE) {
 
   # Check for required packages
   if (!requireNamespace("circlize", quietly = TRUE)) {
@@ -76,16 +79,11 @@ plot_circos_genome <- function(mutation_data,
         samples <- samples[gtools::mixedorder(samples)]
       }
     } else {
-      # Try to detect from column names
-      sample_cols <- grep("\\.(45)?SJY\\d+|/output/index", names(mutation_data), value = TRUE, ignore.case = TRUE)
-      if (length(sample_cols) > 0) {
-        samples <- unique(na.omit(sapply(sample_cols, function(col) {
-          # Extract sample name like "45SJY3" from column name
-          m <- regmatches(col, regexpr("(45)?SJY\\d+", col, ignore.case = TRUE))
-          if (length(m) > 0 && nchar(m) > 0) return(m)
-          return(NA)
-        })))
-        if (requireNamespace("gtools", quietly = TRUE)) {
+      stage_columns <- .breseq_stage_columns(mutation_data)
+      samples <- attr(mutation_data, "breseq_sample_order", exact = TRUE)
+      if (is.null(samples)) {
+        samples <- unique(stage_columns$sample)
+        if (length(samples) && requireNamespace("gtools", quietly = TRUE)) {
           samples <- samples[gtools::mixedorder(samples)]
         }
       }
@@ -155,7 +153,8 @@ plot_circos_genome <- function(mutation_data,
   # Add outer labels for NEW mutations only
   if ("label" %in% names(mut_df)) {
     label_data <- mut_df %>%
-      dplyr::filter(new == TRUE & !is.na(label) & label != "" & !is.na(start) & !is.na(end)) %>%
+      dplyr::filter(new == TRUE & !is.na(label) & label != "" & !is.na(start) & !is.na(end))
+    label_data <- .breseq_filter_intergenic_labels(label_data, hide_intergenic_labels) %>%
       dplyr::mutate(seqid = seqid) %>%
       dplyr::select(seqid, start, end, label, version_color) %>%
       dplyr::filter(start <= end)
@@ -332,6 +331,19 @@ plot_circos_genome <- function(mutation_data,
 }
 
 
+# Filter the label layer only; callers retain their complete mutation data.
+.breseq_filter_intergenic_labels <- function(data, hide_intergenic_labels = FALSE) {
+  if (!isTRUE(hide_intergenic_labels) || !"annotation" %in% names(data)) {
+    return(data)
+  }
+
+  annotation <- trimws(gsub("\u00a0", " ", as.character(data$annotation), fixed = TRUE))
+  intergenic <- !is.na(annotation) &
+    grepl("^intergenic([[:space:]]|$)", annotation, ignore.case = TRUE)
+  data[!intergenic, , drop = FALSE]
+}
+
+
 #' Parse and Prepare Mutation Data for Circos
 #'
 #' Parses mutation strings to determine type and calculates proper end positions.
@@ -374,10 +386,10 @@ parse_and_prepare_mutations <- function(mutation_data, seqid, genome_length, sam
 
     df$position <- as.numeric(gsub(",", "", as.character(df$position)))
 
-    # Find mutation columns (e.g., mutation.45SJY3/output/index)
-    mut_cols <- grep("^mutation\\.", names(df), value = TRUE, ignore.case = TRUE)
-    ann_cols <- grep("^annotation\\.", names(df), value = TRUE, ignore.case = TRUE)
-    gene_cols <- grep("^gene\\.", names(df), value = TRUE, ignore.case = TRUE)
+    # Match complete stage IDs, including suffixes such as 3w and embedded dots.
+    stage_columns <- .breseq_stage_columns(df, sample_order = samples)
+    mutation_columns <- stage_columns[stage_columns$field == "mutation", , drop = FALSE]
+    mut_cols <- names(df)[mutation_columns$index]
 
     if (length(mut_cols) == 0) {
       # Try simple column names
@@ -388,37 +400,19 @@ parse_and_prepare_mutations <- function(mutation_data, seqid, genome_length, sam
       }
     }
 
-    # Extract sample names from column names
-    extract_sample <- function(col) {
-      # Pattern 1: 45SJY followed by numbers
-      m <- regmatches(col, regexpr("45SJY\\d+", col, ignore.case = TRUE))
-      if (length(m) > 0 && nchar(m) > 0) return(m)
-
-      # Pattern 2: SJY followed by numbers
-      m <- regmatches(col, regexpr("SJY\\d+", col, ignore.case = TRUE))
-      if (length(m) > 0 && nchar(m) > 0) return(m)
-
-      # Fallback: extract between . and /
-      parts <- strsplit(col, "\\.")[[1]]
-      if (length(parts) >= 2) {
-        tag <- sub("/.*", "", parts[2])
-        if (nchar(tag) > 0) return(tag)
-      }
-      return(NA)
-    }
-
     message("  Mutation columns found: ", paste(mut_cols, collapse = ", "))
 
     # Build long format data
     long_data <- data.frame()
 
     for (mut_col in mut_cols) {
-      sample_name <- extract_sample(mut_col)
+      sample_name <- mutation_columns$sample[match(mut_col, names(df)[mutation_columns$index])]
+      if (!length(sample_name)) sample_name <- NA_character_
       if (is.na(sample_name)) next
 
       # Find corresponding annotation and gene columns
-      ann_col <- ann_cols[grepl(sample_name, ann_cols, ignore.case = TRUE)]
-      gene_col <- gene_cols[grepl(sample_name, gene_cols, ignore.case = TRUE)]
+      ann_col <- stage_columns$index[stage_columns$field == "annotation" & stage_columns$sample == sample_name]
+      gene_col <- stage_columns$index[stage_columns$field == "gene" & stage_columns$sample == sample_name]
 
       for (i in 1:nrow(df)) {
         mut_val <- df[[mut_col]][i]

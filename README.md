@@ -37,18 +37,16 @@ BiocManager::install(c("ComplexHeatmap", "Biostrings"))
 
 ### Full Pipeline with Circos Visualization
 
-```r
-library(breseqConverter)
-
-> **Note:** Input files must be breseq HTML output (`index.html`). For tracking cumulative mutations across ALE rounds, ensure samples are ordered chronologically (e.g., WT → R1 → R2 → R3). The comparison algorithm detects "new" mutations by sequential pairwise comparison.
+Input files must be breseq HTML reports (`index.html`). Supply `sample_order`
+when the intended chronological order differs from the file names.
 
 ```r
 library(breseqConverter)
 
 # Run complete analysis
-run_breseq_analysis(
-  breseq_dir = "./breseq_outputs",
-  reference_gbk = "reference.gbff",       # Supports .gb, .gbff, .gbk
+run_full_analysis(
+  input_dir = "./breseq_outputs",
+  reference_file = "reference.gbff",      # Supports .gb, .gbff, .gbk
   eggnog_file = "eggnog_annotations.xlsx", # Optional, for COG colors
   output_dir = "breseq_analysis",
   add_genome_map = TRUE
@@ -112,28 +110,164 @@ all_comparisons <- compare_multiple_tables(lineage)
 
 ## Circos Visualization
 
-### `run_breseq_analysis()`
+### `run_full_analysis()`
 
 Complete pipeline for breseq analysis with Circos-style genome visualization.
 
 ```r
-run_breseq_analysis(
-  breseq_dirs,
-  reference_gbk,
+run_full_analysis(
+  input_dir = "breseq_outputs",
+  reference_file = "reference.gbk",
   eggnog_file = NULL,
   output_dir = "breseq_analysis",
   add_genome_map = TRUE
 )
 ```
 
+### Intergenic labels and publication Excel output
+
+These options are available in `run_full_analysis()` and
+`run_breseq_pipeline()`. Their defaults preserve the existing output.
+
+```r
+sample_ids <- c("WT", "sample1", "sample2", "sample3")
+
+results <- run_full_analysis(
+  input_dir = "breseq_outputs",
+  output_dir = "publication_output",
+  reference_file = "reference.gbk",
+  add_genome_map = FALSE,
+  create_genbank = FALSE,
+  hide_intergenic_labels = TRUE,
+  highlight_new = TRUE,
+  clean_headers = TRUE,
+  sample_order = sample_ids,
+  sample_labels = c(
+    WT = "Parent", sample1 = "Strain 1", sample2 = "Strain 2",
+    sample3 = "Final strain"
+  )
+)
+```
+
+Use the exact extracted sample IDs in `sample_order` and the names of
+`sample_labels`; the values of `sample_labels` are display names.
+
+- `hide_intergenic_labels = TRUE` hides labels whose variant annotation starts
+  with `intergenic`. Mutation marks and the underlying data remain present.
+  The option is also available directly in `plot_circos_genome()`.
+- `highlight_new = TRUE` shades every reported call with its stage's pale color,
+  including retained calls, and uses bold text for new or changed calls.
+  Evidence read counts and annotation changes alone do not create a new variant.
+- `clean_headers = TRUE` replaces technical Excel column names with readable
+  field and strain names. Canonical column names are retained in hidden workbook
+  metadata so the package can reload the exported workbook.
+- `sample_order` specifies the comparison order. `sample_labels` changes the
+  displayed strain names without changing sample IDs in the returned R data.
+
+The Excel export helpers accept the same four Excel options. Missing coverage
+and junction evidence remain evidence: a missing call does not demonstrate
+sequence restoration, and a shifted coverage boundary is not automatically a
+new deletion. Intergenic annotations alone do not establish that a variant has
+no functional effect.
+
+Opt-in Excel exports use Arial 10 pt and restrained stage colors. Calls remain
+shaded in every sample where they were reported. Bold text marks a new,
+changed, or reappearing call; revised missing-coverage boundaries and evidence
+inside a prior deletion stay in regular weight. An unreported call is unfilled,
+and earlier calls are never carried forward into samples without evidence.
+Variant classification uses the first reported allele at each locus; the sample
+columns retain every reported allele.
+Junction highlighting uses paired endpoint keys from native comparisons. To
+highlight junctions after importing a plain Excel table, rerun the HTML
+comparison; column-header metadata alone does not encode the endpoint pairs.
+
 ### Circos Plot Tracks (outer → inner)
 
 1. **Chromosome ideogram** — Genome coordinates with Mb labels
 2. **Gene annotations** — COG-colored genes (requires eggNOG file)
 3. **RNA features** — tRNA (green), rRNA (red)
-4. **GC skew** — Positive (blue) / Negative (yellow)
-5. **GC ratio** — Above average (green) / Below average (red)
+4. **GC skew** — At or above the window mean: green `#00FF00`; below: red `#FF0000`
+5. **GC ratio** — At or above the window mean: blue `#0000FF`; below: yellow `#FFFF00`
 6. **Mutation tracks** — One track per sample
+
+GC skew uses `(C - G) / (C + G)`. The full workflow plots each statistic's
+deviation from its window mean. Colors are assigned from the same values used
+for each track, so cached color columns cannot swap the palettes. To change the
+colors, pass a named vector to `run_full_analysis(gc_colors = ...)`:
+
+```r
+gc_colors <- c(
+  skew_positive = "#00FF00", skew_negative = "#FF0000",
+  ratio_positive = "#0000FF", ratio_negative = "#FFFF00"
+)
+```
+
+The four values above match the legacy GenomeDrawer palette. Partial overrides
+are accepted. The intergenic label setting is independent of these colors.
+
+### Standalone script
+
+Download [`one_shot.R`](https://raw.githubusercontent.com/JAEYOONSUNG/breseqConverter/master/inst/scripts/one_shot.R)
+for a self-contained entry point. It includes the converter implementation and
+automatically reads the inputs, prepares genome annotations, exports the
+workbook, plots every replicon, and reconstructs changed GenBank sequences.
+When SnapGene's CLI is available it also creates native `.dna` files. It requires the
+listed R libraries, but no breseqConverter installation, external R scripts,
+GenomeDrawer objects, or separate drawing call.
+
+Edit the paths and settings at the top, then use Source in RStudio or run:
+
+```sh
+Rscript --vanilla one_shot.R
+```
+
+Set `INPUT_DIR` to your data folder. The defaults detect sample IDs, add an
+empty `WT` reference baseline, and write a new output folder on Desktop. Supply
+`SAMPLE_ORDER` when natural filename order differs from the intended chronology.
+Two display settings are:
+
+```r
+HIDE_INTERGENIC_LABELS <- TRUE  # FALSE displays the labels
+GC_COLORS <- c(
+  skew_positive = "#00FF00", skew_negative = "#FF0000",
+  ratio_positive = "#0000FF", ratio_negative = "#FFFF00"
+)
+```
+
+Each ring contains its sample's observed calls, including retained mutations.
+The configured sample order runs from outside to inside. Reference GenBank or
+FASTA, GFF and eggNOG inputs can be detected automatically or supplied explicitly.
+Canonical merged Excel inputs are also supported. Audited coverage display
+evidence is loaded from `coverage_derived_DEL_rows.tsv` when available, kept
+separate from the original calls, and copied into output provenance. The
+converter does not infer missing coverage values from unavailable summary files.
+
+For other datasets, change `INPUT_DIR` and set `SAMPLE_ORDER`, `SAMPLE_LABELS`,
+and `SAMPLE_ALIASES` to `NULL` for automatic sample IDs. Set `BASELINE_ID` to
+`NULL` when a reference baseline should not be added. `one_shot_legacy.R`
+preserves the former script that requires prepared GenomeDrawer objects.
+
+Sequence export settings are `CREATE_GENBANK = TRUE` and `CREATE_DNA = TRUE`.
+Finalized SNPs, insertions, deletions, replacements and exact tandem-repeat
+changes are applied to each sample's reference sequence. Features are lifted
+to the edited coordinates, and affected coding annotations are reviewed or
+retranslated. Invalid reference alleles, unsupported calls and overlapping
+edits stop export with an edit report rather than silently making a sequence.
+
+Each retained sample/replicon produces a `*_called_variants.gbk` under
+`changed_sequences/`, plus `.dna` after successful SnapGene conversion.
+`sequence_manifest.tsv` records exported files, lengths, losses and conversion
+statuses. A finalized whole-replicon deletion produces a loss record instead
+of an empty DNA file. Audited whole-replicon coverage loss is recorded
+separately as `lost_by_coverage`. Unassigned MC boundaries are not exact
+deletion breakpoints: these intervals go into `unresolved_coverage_regions.tsv`
+and are not silently removed from the reconstructed sequence.
+
+SnapGene must be installed and not already running for its documented CLI.
+If it is open, unavailable or delayed, the GenBank files remain usable and the
+manifest records the conversion status; the workflow never quits the app.
+
+Developers can regenerate the entry point with `Rscript tools/build_standalone.R`.
 
 ### Mutation Color Scheme
 
@@ -158,6 +292,26 @@ Standard COG functional category colors are used when eggNOG annotations are pro
 ---
 
 ## SnapGene Export
+
+### Changed-sequence export
+
+`export_changed_sequences_to_genbank()` reconstructs each sample/replicon from
+its finalized calls. The standalone workflow calls this automatically:
+
+```r
+export_changed_sequences_to_genbank(
+  reference_file = "reference.gbk",
+  mutation_list = raw_calls_by_sample,
+  output_dir = "changed_sequences"
+)
+```
+
+### Reference-coordinate annotation export (legacy)
+
+`export_mutations_to_genbank()` and `create_annotated_genbank()` retain the
+reference bases and add colored mutation annotations at reference coordinates.
+They do not reconstruct the mutated sequence. Use the changed-sequence exporter
+or the standalone script for genomes with the calls applied to their bases.
 
 ### `export_mutations_to_genbank()`
 
@@ -221,21 +375,14 @@ export_mutations_to_genbank(
 ```r
 library(breseqConverter)
 
-# Step 1: Define breseq directories
-breseq_dirs <- c(
-  "WT" = "./breseq_output/WT",
-  "45SJY3" = "./breseq_output/45SJY3",
-  "45SJY5" = "./breseq_output/45SJY5",
-  "45SJY7" = "./breseq_output/45SJY7"
-)
-
-# Step 2: Run full analysis with Circos plot
-run_breseq_analysis(
-  breseq_dirs = breseq_dirs,
-  reference_gbk = "GCB.gbk",
+# Place each sample's breseq report under this input directory.
+run_full_analysis(
+  input_dir = "./breseq_output",
+  reference_file = "GCB.gbk",
   eggnog_file = "GCB_eggnog.tsv",
   output_dir = "breseq_analysis",
-  add_genome_map = TRUE
+  add_genome_map = TRUE,
+  sample_order = c("WT", "45SJY3", "45SJY5", "45SJY7")
 )
 
 # Step 3: Export to SnapGene
@@ -307,9 +454,9 @@ When using `export_mutations_to_genbank()` with .dna files, the function checks 
 
 | Status | Biological Interpretation |
 |--------|---------------------------|
-| `New in B` | Acquired mutation (beneficial or hitchhiker) |
-| `Missing in B` | Reversion or secondary suppressor |
-| `Unchanged` | Stable mutation maintained across rounds |
+| `New in B` | Call reported in B and absent from A |
+| `Missing in B` | Call reported in A and absent from B; does not by itself prove reversion |
+| `Unchanged or Modified` | Locus reported in both samples; compare the alleles and evidence |
 
 ### SnapGene Label Guide
 

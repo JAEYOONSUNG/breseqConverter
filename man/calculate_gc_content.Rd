@@ -4,12 +4,19 @@
 \alias{calculate_gc_content}
 \title{Calculate GC Content Statistics from Reference Genome}
 \usage{
-calculate_gc_content(reference_file, window_size = 10000)
+calculate_gc_content(reference_file, window_size = 10000, gc_colors = NULL)
 }
 \arguments{
 \item{reference_file}{Path to reference genome file (GenBank, FASTA, or .dna)}
 
 \item{window_size}{Size of sliding window (default: 10000 bp, GenomeDrawer standard)}
+
+\item{gc_colors}{Optional named character vector overriding any of
+\code{skew_positive}, \code{skew_negative}, \code{ratio_positive}, and
+\code{ratio_negative}. Defaults are \code{#00FF00}, \code{#FF0000},
+\code{#0000FF}, and \code{#FFFF00}, respectively. Colors use each metric's
+deviation from the window mean, with zero treated as positive. Numeric GC
+values and centering do not depend on the palette.}
 }
 \value{
 Data frame with start, end, gc_skew, gc_ratio, gc_skew_minus_average, gc_ratio_minus_average, and colors

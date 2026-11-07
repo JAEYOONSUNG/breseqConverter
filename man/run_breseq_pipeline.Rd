@@ -11,7 +11,12 @@ run_breseq_pipeline(
   genome_lengths = NULL,
   create_plots = TRUE,
   export_snapgene = NULL,
-  color_by = c("type", "stage")
+  color_by = c("type", "stage"),
+  hide_intergenic_labels = FALSE,
+  highlight_new = FALSE,
+  clean_headers = FALSE,
+  sample_labels = NULL,
+  sample_order = NULL
 )
 }
 \arguments{
@@ -31,6 +36,15 @@ If NULL and reference_file is provided, lengths are auto-detected.}
 \item{export_snapgene}{Export annotated GenBank for SnapGene (default: TRUE if reference_file provided)}
 
 \item{color_by}{How to color in plots/GenBank: "type" or "stage"}
+\item{hide_intergenic_labels}{Hide only intergenic Circos labels while retaining all mutation marks.}
+\item{highlight_new}{Fill every observed stage call with a pale stage color,
+including retained calls; use bold for newly reported calls, changed alleles, and
+reappearances. Missing-coverage boundary updates and evidence in a prior deletion
+region are not bold. Default FALSE; these statuses do not imply de novo mutation.
+Either presentation option uses Arial 10 with bold dark-gray headers on white.}
+\item{clean_headers}{Export readable Excel headers and hidden canonical-column metadata.}
+\item{sample_labels}{Named sample-ID to display-label map, used only with clean_headers=TRUE.}
+\item{sample_order}{Optional exact chronological order of all detected sample IDs.}
 }
 \value{
 List containing all results: comparisons, plots, and output file paths

@@ -4,13 +4,23 @@
 \alias{save_results_to_excel}
 \title{Save Merged Results to Separate Excel Files}
 \usage{
-save_results_to_excel(results, output_dir = ".")
+save_results_to_excel(results, output_dir = ".",
+  highlight_new = FALSE, clean_headers = FALSE,
+  sample_labels = NULL, sample_order = NULL)
 }
 \arguments{
 \item{results}{A named list of data frames (e.g., the output of \code{compare_and_merge_multiple_tables}).}
 
 \item{output_dir}{A character string specifying the directory where the Excel files will be saved.
 Defaults to the current working directory.}
+\item{highlight_new}{Fill every observed stage call with a pale stage color,
+including retained calls; use bold for newly reported calls, changed alleles, and
+reappearances. Missing-coverage boundary updates and evidence in a prior deletion
+region are not bold. Default FALSE; these statuses do not imply de novo mutation.
+Either presentation option uses Arial 10 with bold dark-gray headers on white.}
+\item{clean_headers}{Use readable export headers with hidden canonical-column metadata.}
+\item{sample_labels}{Named sample-ID to display-label map, used only with clean_headers=TRUE.}
+\item{sample_order}{Optional exact chronological sample order.}
 }
 \value{
 None. The function saves the results as Excel files in the specified directory.

@@ -85,13 +85,15 @@ normalize_range <- function(start, end, genome_length) {
 #'
 #' Parses various position formats from breseq HTML output.
 #' Handles formats like: "1234", "1,234", "1234-5678", "1234–5678" (en-dash)
+#' and junction endpoints such as "= 1234" or "1234 =". Orientation markers are
+#' ignored only for the returned coordinates; the reported input is not changed.
 #'
 #' @param position_str Position string to parse
 #' @return List with start and end positions, or single position if not a range
 #' @export
 parse_position <- function(position_str) {
 
-  if (is.na(position_str) || is.null(position_str)) {
+  if (is.null(position_str) || !length(position_str) || is.na(position_str)) {
     return(list(start = NA_integer_, end = NA_integer_))
   }
 
@@ -100,11 +102,14 @@ parse_position <- function(position_str) {
   pos_str <- gsub(",", "", pos_str)           # Remove commas
   pos_str <- gsub("–", "-", pos_str)          # Replace en-dash with hyphen
   pos_str <- gsub("—", "-", pos_str)          # Replace em-dash with hyphen
+  pos_str <- gsub("\u00a0", " ", pos_str, fixed = TRUE)
   pos_str <- trimws(pos_str)
+  pos_str <- gsub("^[[:space:]=<>]+|[[:space:]=<>]+$", "", pos_str)
   pos_str <- gsub("-$", "", pos_str)          # Remove trailing dash
+  pos_str <- trimws(pos_str)
 
   # Check for range format
-  if (grepl("-", pos_str)) {
+  if (grepl("^[0-9]+[[:space:]]*-[[:space:]]*[0-9]+$", pos_str)) {
     parts <- strsplit(pos_str, "-")[[1]]
     if (length(parts) == 2) {
       start <- as.integer(parts[1])
@@ -114,7 +119,7 @@ parse_position <- function(position_str) {
   }
 
   # Single position
-  pos <- as.integer(pos_str)
+  pos <- if (grepl("^[0-9]+$", pos_str)) as.integer(pos_str) else NA_integer_
   return(list(start = pos, end = pos))
 }
 

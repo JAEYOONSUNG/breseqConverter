@@ -12,6 +12,19 @@
 #' @param add_genome_map Add genome map with COG annotations (NULL=ask, TRUE/FALSE=skip prompt)
 #' @param create_circos Create Circos-style circular genome map (default: TRUE)
 #' @param create_genbank Create annotated GenBank file for SnapGene (default: TRUE)
+#' @param hide_intergenic_labels Hide intergenic annotation labels in Circos
+#'   plots without removing mutation marks or data (default: FALSE).
+#' @param highlight_new Shade every reported call by stage and bold new or
+#'   changed calls in Excel exports (default: FALSE).
+#' @param clean_headers Use concise Excel column headers (default: FALSE).
+#' @param sample_labels Optional named vector mapping sample IDs to display labels
+#'   in Excel exports.
+#' @param sample_order Optional sample IDs in analysis order. When NULL, an order
+#'   saved in Excel metadata is used, otherwise samples are naturally sorted.
+#' @param gc_colors Optional named color overrides: skew_positive, skew_negative,
+#'   ratio_positive, ratio_negative. Defaults are green/red (#00FF00/#FF0000) for
+#'   GC skew and blue/yellow (#0000FF/#FFFF00) for GC ratio. Colors follow the sign
+#'   of deviation from the window mean; zero uses the positive color.
 #' @return List containing all results and file paths
 #' @export
 #' @examples
@@ -38,7 +51,15 @@ run_full_analysis <- function(input_dir = ".",
                               eggnog_file = NULL,
                               add_genome_map = NULL,
                               create_circos = TRUE,
-                              create_genbank = TRUE) {
+                              create_genbank = TRUE,
+                              hide_intergenic_labels = FALSE,
+                              highlight_new = FALSE,
+                              clean_headers = FALSE,
+                              sample_labels = NULL,
+                              sample_order = NULL,
+                              gc_colors = NULL) {
+
+  gc_colors <- .breseq_gc_colors(gc_colors)
 
   # Use current directory as default
   if (input_dir == ".") {
@@ -238,7 +259,12 @@ run_full_analysis <- function(input_dir = ".",
       output_dir = output_dir,
       reference_file = reference_file,
       create_plots = FALSE,
-      export_snapgene = FALSE
+      export_snapgene = FALSE,
+      hide_intergenic_labels = hide_intergenic_labels,
+      highlight_new = highlight_new,
+      clean_headers = clean_headers,
+      sample_labels = sample_labels,
+      sample_order = sample_order
     )
 
     excel_file <- pipeline_results$excel_file
@@ -253,7 +279,7 @@ run_full_analysis <- function(input_dir = ".",
 
   # Step 3: Process mutation data for visualization
   message("\n[3/5] Processing mutation data...")
-  processed_data <- process_mutation_data_for_viz(mutation_data)
+  processed_data <- process_mutation_data_for_viz(mutation_data, sample_order = sample_order)
   results$mutation_list <- processed_data$mutation_list
   results$missing_data <- processed_data$missing_data
   results$samples <- processed_data$samples
@@ -288,7 +314,8 @@ run_full_analysis <- function(input_dir = ".",
       # Calculate GC content if reference file is available
       if (!is.null(reference_file) && file.exists(reference_file)) {
         message("  Calculating GC content...")
-        gc_data <- calculate_gc_content(reference_file, window_size = 10000)
+        gc_data <- calculate_gc_content(reference_file, window_size = 10000,
+                                        gc_colors = gc_colors)
         results$gc_data <- gc_data
       }
     } else {
@@ -305,7 +332,9 @@ run_full_analysis <- function(input_dir = ".",
         gff_data = gff_data,         # NULL if add_genome_map = FALSE
         eggnog_data = eggnog_data,   # NULL if add_genome_map = FALSE
         gc_data = gc_data,           # NULL if add_genome_map = FALSE
-        output_file = circos_file
+        output_file = circos_file,
+        hide_intergenic_labels = hide_intergenic_labels,
+        gc_colors = gc_colors
       )
       results$circos_file <- circos_file
       message("  Saved: ", circos_file)
@@ -362,7 +391,8 @@ load_mutation_excel <- function(excel_file) {
   data_list <- list()
   for (sheet in sheet_names) {
     tryCatch({
-      data_list[[sheet]] <- openxlsx::read.xlsx(excel_file, sheet = sheet)
+      data <- openxlsx::read.xlsx(excel_file, sheet = sheet, check.names = FALSE, sep.names = " ")
+      data_list[[sheet]] <- restore_canonical_export_headers(excel_file, sheet, data)
       message("  Loaded sheet '", sheet, "': ", nrow(data_list[[sheet]]), " rows")
     }, error = function(e) {
       message("  Sheet '", sheet, "' not found or empty")
@@ -756,9 +786,14 @@ get_cog_legends <- function() {
 #'
 #' @param reference_file Path to reference genome file (GenBank, FASTA, or .dna)
 #' @param window_size Size of sliding window (default: 10000 bp, GenomeDrawer standard)
+#' @param gc_colors Optional named color overrides for skew_positive,
+#'   skew_negative, ratio_positive, ratio_negative. Defaults are #00FF00,
+#'   #FF0000, #0000FF, and #FFFF00, respectively; zero deviation is positive.
 #' @return Data frame with start, end, gc_skew, gc_ratio, gc_skew_minus_average, gc_ratio_minus_average, and colors
 #' @keywords internal
-calculate_gc_content <- function(reference_file, window_size = 10000) {
+calculate_gc_content <- function(reference_file, window_size = 10000, gc_colors = NULL) {
+
+  gc_colors <- .breseq_gc_colors(gc_colors)
 
   if (!file.exists(reference_file)) {
     warning("Reference file not found: ", reference_file)
@@ -862,11 +897,11 @@ calculate_gc_content <- function(reference_file, window_size = 10000) {
   gc_data$gc_skew_deviation <- gc_data$gc_skew_minus_average
   gc_data$gc_ratio_deviation <- gc_data$gc_ratio_minus_average
 
-  # Assign colors (트랙 출력 순서에 맞게 스왑됨)
-  # 결과: GC skew 트랙 = + 파란색(#0066CC), - 노란색(#FFD700)
-  # 결과: GC ratio 트랙 = + 초록색(#228B22), - 빨간색(#DC143C)
-  gc_data$gc_skew_color <- ifelse(gc_data$gc_skew_minus_average >= 0, "#228B22", "#DC143C")
-  gc_data$gc_ratio_color <- ifelse(gc_data$gc_ratio_minus_average >= 0, "#0066CC", "#FFD700")
+  # Color each metric by its own deviation from the window mean.
+  gc_data$gc_skew_color <- ifelse(gc_data$gc_skew_minus_average >= 0,
+    gc_colors[["skew_positive"]], gc_colors[["skew_negative"]])
+  gc_data$gc_ratio_color <- ifelse(gc_data$gc_ratio_minus_average >= 0,
+    gc_colors[["ratio_positive"]], gc_colors[["ratio_negative"]])
 
   message("    GC skew range: ", round(min(gc_data$gc_skew), 3), " to ", round(max(gc_data$gc_skew), 3))
   message("    GC ratio range: ", round(min(gc_data$gc_ratio), 3), " to ", round(max(gc_data$gc_ratio), 3))
@@ -882,9 +917,11 @@ calculate_gc_content <- function(reference_file, window_size = 10000) {
 #' identifies new mutations at each ALE stage, and processes missing regions.
 #'
 #' @param mutation_data List from load_mutation_excel()
+#' @param sample_order Optional sample IDs in analysis order. Saved Excel metadata
+#'   supplies the order when this argument is NULL.
 #' @return List with mutation_list, missing_data, and samples
 #' @keywords internal
-process_mutation_data_for_viz <- function(mutation_data) {
+process_mutation_data_for_viz <- function(mutation_data, sample_order = NULL) {
 
   if (!requireNamespace("reshape2", quietly = TRUE)) {
     stop("Package 'reshape2' required. Install with: install.packages('reshape2')")
@@ -895,6 +932,17 @@ process_mutation_data_for_viz <- function(mutation_data) {
 
   mutations_df <- mutation_data[["Mutations"]]
   missing_df <- mutation_data[["Missing"]]
+  requested_order <- sample_order
+  if (is.null(requested_order)) {
+    requested_order <- attr(mutations_df, "breseq_sample_order", exact = TRUE)
+  }
+  if (!is.null(requested_order)) {
+    requested_order <- as.character(requested_order)
+    if (anyNA(requested_order) || any(!nzchar(requested_order)) ||
+        anyDuplicated(requested_order)) {
+      stop("sample_order must contain unique, non-empty sample IDs")
+    }
+  }
 
   mutation_list <- list()
   missing_processed <- NULL
@@ -911,30 +959,17 @@ process_mutation_data_for_viz <- function(mutation_data) {
 
     # Identify columns
     base_cols <- c("position")
-    value_cols <- c("evidence", "mutation", "annotation", "gene", "description")
+    value_cols <- c("evidence", "seq id", "mutation", "annotation", "gene", "description")
     all_cols <- colnames(mutations_df)
     tag_cols <- setdiff(all_cols, c(base_cols, value_cols))
+    stage_columns <- .breseq_stage_columns(mutations_df, sample_order = requested_order)
+    sample_by_column <- stats::setNames(stage_columns$sample, all_cols[stage_columns$index])
+    field_by_column <- stats::setNames(stage_columns$field, all_cols[stage_columns$index])
 
     # Extract sample names from column names
     get_sample_name <- function(col_name) {
       if (col_name %in% value_cols) return("None")
-
-      # Pattern 1: 45SJY followed by numbers (e.g., 45SJY3, 45SJY16)
-      m <- regmatches(col_name, regexpr("45SJY\\d+", col_name, ignore.case = TRUE))
-      if (length(m) > 0 && nchar(m) > 0) return(m)
-
-      # Pattern 2: SJY followed by numbers (e.g., SJY3, SJY16)
-      m <- regmatches(col_name, regexpr("SJY\\d+", col_name, ignore.case = TRUE))
-      if (length(m) > 0 && nchar(m) > 0) return(m)
-
-      # Pattern 3: Extract from dot-separated format (mutation.SAMPLE/output/index)
-      parts <- strsplit(col_name, "\\.")[[1]]
-      if (length(parts) > 1) {
-        tag <- sub("/output.*", "", parts[2])
-        tag <- sub("/.*", "", tag)  # Remove anything after first /
-        if (nchar(tag) > 0 && tag != col_name) return(tag)
-      }
-
+      if (col_name %in% names(sample_by_column)) return(unname(sample_by_column[[col_name]]))
       return("Unknown")
     }
 
@@ -946,8 +981,8 @@ process_mutation_data_for_viz <- function(mutation_data) {
 
     # Melt to long format
     melted <- reshape2::melt(
-      mutations_df,
-      id.vars = "position",
+      transform(mutations_df, .breseq_source_row = seq_len(nrow(mutations_df))),
+      id.vars = c(".breseq_source_row", "position"),
       measure.vars = setdiff(all_cols, "position"),
       variable.name = "variable",
       value.name = "value"
@@ -956,11 +991,8 @@ process_mutation_data_for_viz <- function(mutation_data) {
     # Extract sample and variable type
     melted$ALE_version <- sapply(as.character(melted$variable), get_sample_name)
     melted$variable_type <- sapply(as.character(melted$variable), function(v) {
-      if (grepl("^evidence", v)) return("evidence")
-      if (grepl("^mutation", v)) return("mutation")
-      if (grepl("^annotation", v)) return("annotation")
-      if (grepl("^gene", v)) return("gene")
-      if (grepl("^description", v)) return("description")
+      if (v %in% value_cols) return(v)
+      if (v %in% names(field_by_column)) return(unname(field_by_column[[v]]))
       return("other")
     })
 
@@ -970,7 +1002,7 @@ process_mutation_data_for_viz <- function(mutation_data) {
     if (nrow(melted) > 0) {
       mutation_casted <- reshape2::dcast(
         melted,
-        position + ALE_version ~ variable_type,
+        .breseq_source_row + position + ALE_version ~ variable_type,
         value.var = "value",
         fun.aggregate = function(x) paste(stats::na.omit(x), collapse = ";")
       )
@@ -978,6 +1010,10 @@ process_mutation_data_for_viz <- function(mutation_data) {
       # Ensure required columns exist
       for (col in c("mutation", "annotation", "gene", "description")) {
         if (!col %in% names(mutation_casted)) mutation_casted[[col]] <- NA
+      }
+      source_seq_col <- intersect(c("seq id", "seq_id", "seqid"), names(mutations_df))
+      if (!"seq id" %in% names(mutation_casted) && length(source_seq_col)) {
+        mutation_casted[["seq id"]] <- mutations_df[[source_seq_col[1]]][mutation_casted$.breseq_source_row]
       }
 
       # Create label
@@ -991,7 +1027,15 @@ process_mutation_data_for_viz <- function(mutation_data) {
       # Get sorted sample names
       samples <- unique(mutation_casted$ALE_version)
       samples <- samples[samples != "None" & samples != "Unknown"]
-      samples <- samples[gtools::mixedorder(samples)]
+      if (is.null(requested_order)) {
+        samples <- samples[gtools::mixedorder(samples)]
+      } else {
+        omitted <- setdiff(samples, requested_order)
+        if (length(omitted)) {
+          stop("sample_order omits observed samples: ", paste(omitted, collapse = ", "))
+        }
+        samples <- requested_order
+      }
 
       # Create sample colors
       n_samples <- length(samples)
@@ -1002,23 +1046,22 @@ process_mutation_data_for_viz <- function(mutation_data) {
         )
 
         # Track new mutations per sample
-        previous_mutations <- data.frame(position = numeric(), mutation = character())
+        previous_mutations <- character()
 
         for (sample in samples) {
           sample_data <- mutation_casted[mutation_casted$ALE_version == sample, ]
 
           if (nrow(sample_data) > 0) {
             # Mark new mutations
-            sample_data$new <- !paste(sample_data$position, sample_data$mutation, sep = ":") %in%
-              paste(previous_mutations$position, previous_mutations$mutation, sep = ":")
+            replicon <- if ("seq id" %in% names(sample_data)) as.character(sample_data[["seq id"]]) else ""
+            mutation_keys <- paste(replicon, sample_data$position, sample_data$mutation, sep = "\r")
+            sample_data$new <- !mutation_keys %in% previous_mutations
 
             sample_data$version_color <- sample_colors[sample]
 
+            sample_data$.breseq_source_row <- NULL
             mutation_list[[sample]] <- sample_data
-            previous_mutations <- rbind(
-              previous_mutations,
-              sample_data[, c("position", "mutation")]
-            )
+            previous_mutations <- unique(c(previous_mutations, mutation_keys))
           }
         }
       }
@@ -1065,26 +1108,15 @@ process_missing_regions <- function(missing_df, samples) {
   value_cols <- c("seq id", "end", "size", "gene", "description",
                   "Forward aligned reads", "Reverse aligned reads", "Read Coverage Depth")
   all_cols <- colnames(missing_df)
+  stage_columns <- .breseq_stage_columns(missing_df, sample_order = samples)
+  sample_by_column <- stats::setNames(stage_columns$sample, all_cols[stage_columns$index])
+  field_by_column <- stats::setNames(stage_columns$field, all_cols[stage_columns$index])
 
   # Get sample names
   get_sample_name <- function(col_name) {
     if (col_name %in% value_cols) return("None")
 
-    # Pattern 1: 45SJY followed by numbers
-    m <- regmatches(col_name, regexpr("45SJY\\d+", col_name, ignore.case = TRUE))
-    if (length(m) > 0 && nchar(m) > 0) return(m)
-
-    # Pattern 2: SJY followed by numbers
-    m <- regmatches(col_name, regexpr("SJY\\d+", col_name, ignore.case = TRUE))
-    if (length(m) > 0 && nchar(m) > 0) return(m)
-
-    # Fallback
-    parts <- strsplit(col_name, "\\.")[[1]]
-    if (length(parts) > 1) {
-      tag <- sub("/output.*", "", parts[2])
-      tag <- sub("/.*", "", tag)
-      if (nchar(tag) > 0) return(tag)
-    }
+    if (col_name %in% names(sample_by_column)) return(unname(sample_by_column[[col_name]]))
     return("Unknown")
   }
 
@@ -1099,11 +1131,8 @@ process_missing_regions <- function(missing_df, samples) {
 
   melted$ALE_version <- sapply(as.character(melted$variable), get_sample_name)
   melted$variable_type <- sapply(as.character(melted$variable), function(v) {
-    for (val_col in value_cols) {
-      if (grepl(paste0("^", gsub("([.|()\\^{}+$*?])", "\\\\\\1", val_col)), v)) {
-        return(val_col)
-      }
-    }
+    if (v %in% value_cols) return(v)
+    if (v %in% names(field_by_column)) return(unname(field_by_column[[v]]))
     return("other")
   })
 
@@ -1211,7 +1240,20 @@ process_missing_regions <- function(missing_df, samples) {
 #' @param genome_info Genome info from parse_reference_info()
 #' @param gff_data Parsed GFF data for gene annotation tracks (optional)
 #' @param eggnog_data Parsed eggNOG data for COG annotation tracks (optional)
+#' @param gc_data GC content and skew data for inner tracks (optional)
 #' @param output_file Output PDF file path
+#' @param hide_intergenic_labels Hide labels whose annotation starts with
+#'   "intergenic" (default: FALSE). Mutation marks and data are retained.
+#' @param gc_colors Optional named overrides for skew_positive, skew_negative,
+#'   ratio_positive, ratio_negative. Defaults are #00FF00/#FF0000 for GC skew
+#'   and #0000FF/#FFFF00 for GC ratio. Colors are recomputed from metric deviations
+#'   at render time; cached color columns are ignored. Zero is positive.
+#' @param observed_tracks If TRUE, each mutation ring contains only calls observed
+#'   in that sample. Default FALSE preserves cumulative tracks. The new flag
+#'   controls labels only, not whether an observed call receives a mark.
+#' @param reverse_tracks If TRUE (default), the last sample is the outermost ring.
+#'   If FALSE, samples run outside to inside in the supplied order. Sample colors
+#'   and the chronological order used for cumulative calls are unchanged.
 #' @return Path to created file
 #' @keywords internal
 create_full_circos_plot <- function(mutation_list,
@@ -1221,7 +1263,19 @@ create_full_circos_plot <- function(mutation_list,
                                     gff_data = NULL,
                                     eggnog_data = NULL,
                                     gc_data = NULL,
-                                    output_file = "circos_map.pdf") {
+                                    output_file = "circos_map.pdf",
+                                    hide_intergenic_labels = FALSE,
+                                    gc_colors = NULL,
+                                    observed_tracks = FALSE,
+                                    reverse_tracks = TRUE) {
+
+  gc_colors <- .breseq_gc_colors(gc_colors)
+  if (!is.logical(observed_tracks) || length(observed_tracks) != 1L || is.na(observed_tracks)) {
+    stop("observed_tracks must be a single TRUE/FALSE value.")
+  }
+  if (!is.logical(reverse_tracks) || length(reverse_tracks) != 1L || is.na(reverse_tracks)) {
+    stop("reverse_tracks must be a single TRUE/FALSE value.")
+  }
 
   if (!requireNamespace("circlize", quietly = TRUE)) {
     stop("Package 'circlize' required")
@@ -1266,7 +1320,19 @@ create_full_circos_plot <- function(mutation_list,
   missing_colors <- c("MC_inversion" = "#FF6B6B", "MC_repeat" = "#4ECDC4")
 
   # Open PDF
-  grDevices::pdf(file = output_file, width = 14, height = 14)
+  if (capabilities("cairo")) {
+    grDevices::cairo_pdf(file = output_file, width = 14, height = 14, family = "Arial")
+  } else {
+    grDevices::pdf(file = output_file, width = 14, height = 14)
+  }
+  plot_device <- grDevices::dev.cur()
+  on.exit({
+    if (plot_device %in% grDevices::dev.list()) {
+      grDevices::dev.set(plot_device)
+      try(circlize::circos.clear(), silent = TRUE)
+      grDevices::dev.off(plot_device)
+    }
+  }, add = TRUE)
 
   # Initialize circos with proper canvas settings
   circlize::circos.clear()
@@ -1497,7 +1563,16 @@ create_full_circos_plot <- function(mutation_list,
   # Combine all mutation data
   all_mutations <- do.call(rbind, lapply(names(mutation_list), function(sample) {
     df <- mutation_list[[sample]]
-    df$sample <- sample
+    df$sample <- rep(sample, nrow(df))
+    if (!nrow(df)) {
+      df$type <- character()
+      df$type_color <- character()
+      df$start <- numeric()
+      df$end <- numeric()
+      if (!"new" %in% names(df)) df$new <- logical()
+      if (!"label" %in% names(df)) df$label <- character()
+      return(df)
+    }
     df$type <- sapply(df$mutation, parse_mut_type)
     df$type_color <- ifelse(df$type %in% names(type_colors),
                             type_colors[df$type], type_colors["UNKNOWN"])
@@ -1508,6 +1583,11 @@ create_full_circos_plot <- function(mutation_list,
     df$end <- pmax(df$end, df$start + 500)
     df
   }))
+  if (is.null(all_mutations)) {
+    all_mutations <- data.frame(sample = character(), type = character(),
+      type_color = character(), start = numeric(), end = numeric(),
+      new = logical(), label = character())
+  }
 
   # Filter new mutations for plotting
   new_mutations <- all_mutations[all_mutations$new == TRUE, ]
@@ -1515,6 +1595,7 @@ create_full_circos_plot <- function(mutation_list,
   # Add labels for new mutations
   if (nrow(new_mutations) > 0 && any(!is.na(new_mutations$label) & new_mutations$label != "")) {
     label_data <- new_mutations[!is.na(new_mutations$label) & new_mutations$label != "", ]
+    label_data <- .breseq_filter_intergenic_labels(label_data, hide_intergenic_labels)
     if (nrow(label_data) > 0) {
       label_bed <- data.frame(
         seqid = seqid,
@@ -1540,23 +1621,26 @@ create_full_circos_plot <- function(mutation_list,
     }
   }
 
-  # Mutation tracks (cumulative by sample)
-  # REVERSE ORDER: outermost track = most accumulated (last sample)
+  # Ring direction is independent of chronological sample order and colors.
   track_idx <- circlize::get.current.track.index() + 1
-  reversed_samples <- rev(samples)  # 45SJY16 -> 45SJY10 -> ... -> 45SJY3
+  track_samples <- if (reverse_tracks) rev(samples) else samples
   mutation_track_start <- track_idx
 
-  for (i in seq_along(reversed_samples)) {
-    sample <- reversed_samples[i]
-    # Get index in original order for cumulative calculation
-    orig_idx <- which(samples == sample)
-    # Cumulative: all mutations up to this sample in original order
-    cumulative_samples <- samples[1:orig_idx]
-    cum_data <- all_mutations[all_mutations$sample %in% cumulative_samples, ]
+  for (i in seq_along(track_samples)) {
+    sample <- track_samples[i]
+    if (observed_tracks) {
+      cum_data <- all_mutations[all_mutations$sample == sample, , drop = FALSE]
+    } else {
+      # Cumulative: all mutations up to this sample in original order
+      orig_idx <- which(samples == sample)
+      cumulative_samples <- samples[1:orig_idx]
+      cum_data <- all_mutations[all_mutations$sample %in% cumulative_samples, , drop = FALSE]
+    }
 
     bg_color <- adjustcolor(sample_colors[sample], alpha.f = 0.2)
 
-    message("    Track ", i, " (", sample, "): ", nrow(cum_data), " cumulative mutations")
+    message("    Track ", i, " (", sample, "): ", nrow(cum_data),
+            if (observed_tracks) " observed mutations" else " cumulative mutations")
 
     if (nrow(cum_data) > 0) {
       # Pre-compute data for panel.fun closure
@@ -1806,11 +1890,14 @@ create_full_circos_plot <- function(mutation_list,
     ratio_col <- if ("gc_ratio_minus_average" %in% names(gc_plot)) "gc_ratio_minus_average" else "gc_ratio_deviation"
 
     max_skew <- max(abs(gc_plot[[skew_col]]), na.rm = TRUE)
+    if (!is.finite(max_skew) || max_skew == 0) max_skew <- 1
 
     # Force evaluation of colors before closure (closure 문제 방지)
     skew_values <- gc_plot[[skew_col]]
     skew_positions <- (gc_plot$start + gc_plot$end) / 2
-    skew_colors <- gc_plot$gc_skew_color  # + 파란색 (#0066CC), - 노란색 (#FFD700)
+    skew_widths <- gc_plot$end - gc_plot$start + 1
+    skew_colors <- ifelse(skew_values >= 0,
+      gc_colors[["skew_positive"]], gc_colors[["skew_negative"]])
 
     # GC Skew track using circos.barplot (breesq_drawer.R line 386-396)
     circlize::circos.track(
@@ -1826,7 +1913,7 @@ create_full_circos_plot <- function(mutation_list,
           pos = skew_positions,
           col = skew_colors,
           border = NA,
-          bar_width = 10000
+          bar_width = skew_widths
         )
       }
     )
@@ -1835,11 +1922,14 @@ create_full_circos_plot <- function(mutation_list,
     message("    Adding GC ratio track (circos.barplot, GenomeDrawer style)...")
 
     max_ratio <- max(abs(gc_plot[[ratio_col]]), na.rm = TRUE)
+    if (!is.finite(max_ratio) || max_ratio == 0) max_ratio <- 1
 
     # Force evaluation of colors before closure (closure 문제 방지)
     ratio_values <- gc_plot[[ratio_col]]
     ratio_positions <- (gc_plot$start + gc_plot$end) / 2
-    ratio_colors <- gc_plot$gc_ratio_color  # + 초록색 (#228B22), - 빨간색 (#DC143C)
+    ratio_widths <- gc_plot$end - gc_plot$start + 1
+    ratio_colors <- ifelse(ratio_values >= 0,
+      gc_colors[["ratio_positive"]], gc_colors[["ratio_negative"]])
 
     # GC Ratio track using circos.barplot (breesq_drawer.R style)
     circlize::circos.track(
@@ -1855,7 +1945,7 @@ create_full_circos_plot <- function(mutation_list,
           pos = ratio_positions,
           col = ratio_colors,
           border = NA,
-          bar_width = 10000
+          bar_width = ratio_widths
         )
       }
     )
@@ -1966,9 +2056,9 @@ create_full_circos_plot <- function(mutation_list,
 
   # Sample legend (track background colors with transparency) -> 왼쪽 아래
   lgd_sample <- ComplexHeatmap::Legend(
-    labels = rev(samples),  # Match track order
+    labels = track_samples,  # Match outside-to-inside track order
     title = "ALE Version (Track)",
-    legend_gp = grid::gpar(fill = adjustcolor(rev(sample_colors), alpha.f = 0.3)),
+    legend_gp = grid::gpar(fill = adjustcolor(sample_colors[track_samples], alpha.f = 0.3)),
     ncol = 1
   )
   lgd_list_left <- c(lgd_list_left, list(lgd_sample))
@@ -1998,8 +2088,8 @@ create_full_circos_plot <- function(mutation_list,
                          just = c("right", "bottom"))
   }
 
-  grDevices::dev.off()
   circlize::circos.clear()
+  grDevices::dev.off(plot_device)
 
   return(output_file)
 }

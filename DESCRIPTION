@@ -1,6 +1,6 @@
 Package: breseqConverter
 Title: Parse, Compare, and Visualize breseq Mutation Data
-Version: 1.0.0
+Version: 1.1.0
 Authors@R:
     person("Jae-Yoon", "Sung", email = "sungjaeyoon92@gmail.com",
            role = c("aut", "cre"),
@@ -19,7 +19,7 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Depends:
-    R (>= 4.0.0)
+    R (>= 4.1.0)
 Imports:
     dplyr,
     rvest,

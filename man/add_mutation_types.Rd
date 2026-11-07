@@ -22,4 +22,7 @@ Data frame with added 'mutation_type' column
 }
 \description{
 Adds a 'mutation_type' column to a data frame containing mutation data.
+If the requested mutation column is absent, each row is classified using its
+first non-empty canonical stage mutation column. Source columns, including later
+allele changes, are retained.
 }

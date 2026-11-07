@@ -4,11 +4,12 @@
 \alias{compare_multiple_tables}
 \title{Sequentially Compare Multiple Lists of Tables}
 \usage{
-compare_multiple_tables(list_of_tables)
+compare_multiple_tables(list_of_tables, sample_order = NULL)
 }
 \arguments{
 \item{list_of_tables}{A list of named lists of data frames. Each named list should have identical names
 across all entries to ensure accurate comparisons.}
+\item{sample_order}{Optional character vector containing every input sample exactly once.}
 }
 \value{
 A named list where each entry corresponds to the comparison results of a pair of lists.

@@ -14,6 +14,11 @@
 #' @param create_plots Create visualization plots (default: TRUE)
 #' @param export_snapgene Export annotated GenBank for SnapGene (default: TRUE if reference_file provided)
 #' @param color_by How to color in plots/GenBank: "type" or "stage"
+#' @param hide_intergenic_labels Hide only intergenic Circos labels, keeping all mutation marks.
+#' @param highlight_new Shade reported Excel calls by stage and bold new or changed calls; default FALSE.
+#' @param clean_headers Export readable Excel headers and hidden canonical-column metadata.
+#' @param sample_labels Named sample-ID to display-label map, used only with clean_headers=TRUE.
+#' @param sample_order Optional exact chronological order of all detected sample IDs.
 #' @return List containing all results: comparisons, plots, and output file paths
 #' @export
 #' @examples
@@ -37,7 +42,12 @@ run_breseq_pipeline <- function(input_dir = ".",
                                 genome_lengths = NULL,
                                 create_plots = TRUE,
                                 export_snapgene = NULL,
-                                color_by = c("type", "stage")) {
+                                color_by = c("type", "stage"),
+                                hide_intergenic_labels = FALSE,
+                                highlight_new = FALSE,
+                                clean_headers = FALSE,
+                                sample_labels = NULL,
+                                sample_order = NULL) {
 
   color_by <- match.arg(color_by)
 
@@ -113,19 +123,14 @@ run_breseq_pipeline <- function(input_dir = ".",
     # Get sample name - try filename first, then directory
     filename <- tools::file_path_sans_ext(basename(html_file))
 
-    # Try to extract sample name from filename (e.g., "index_45SJY3" -> "45SJY3")
-    sample_match <- regmatches(filename, regexpr("(45)?SJY\\d+", filename, ignore.case = TRUE))
-    if (length(sample_match) > 0 && nchar(sample_match) > 0) {
-      sample_name <- sample_match
+    # Preserve the complete identifier, including suffixes such as 3w.
+    if (!identical(tolower(filename), "index")) {
+      sample_name <- sub("_index$", "", sub("^index_", "", filename, ignore.case = TRUE), ignore.case = TRUE)
     } else {
-      # Fall back to directory name or filename
       dir_name <- basename(dirname(html_file))
-      if (dir_name %in% c("output", ".", "extdata", "inst")) {
-        sample_name <- filename
-      } else {
-        sample_name <- dir_name
-      }
+      sample_name <- if (dir_name == "output") basename(dirname(dirname(html_file))) else dir_name
     }
+    if (sample_name %in% names(extracted_tables)) stop("Duplicate sample ID: ", sample_name)
 
     message("  Processing: ", sample_name)
 
@@ -141,7 +146,11 @@ run_breseq_pipeline <- function(input_dir = ".",
 
   # Sort samples by natural order (SJY3 -> SJY7 -> SJY8 -> SJY10 -> SJY16)
   sample_names <- names(extracted_tables)
-  if (requireNamespace("gtools", quietly = TRUE)) {
+  if (!is.null(sample_order)) {
+    if (!is.character(sample_order) || anyNA(sample_order) || anyDuplicated(sample_order) ||
+        !setequal(sample_order, sample_names)) stop("sample_order must contain every detected sample exactly once.")
+    sample_names <- sample_order
+  } else if (requireNamespace("gtools", quietly = TRUE)) {
     sample_names <- sample_names[gtools::mixedorder(sample_names)]
   } else {
     sample_names <- sort(sample_names)
@@ -157,7 +166,7 @@ run_breseq_pipeline <- function(input_dir = ".",
   message("  ", paste(sample_names, collapse = " -> "))
 
   # Interactive confirmation (only in interactive mode)
-  if (interactive()) {
+  if (interactive() && is.null(sample_order)) {
     message("\n  Is this the correct order of evolution stages?")
     message("  (Mutations will be tracked cumulatively in this order)")
     response <- readline("  Press ENTER to confirm, or type the correct order (comma-separated): ")
@@ -214,8 +223,16 @@ run_breseq_pipeline <- function(input_dir = ".",
     message("  Normalizing positions for ", length(genome_lengths), " replicon(s)...")
     for (name in names(merged_results)) {
       df <- merged_results[[name]]
+      # A shared junction endpoint is not a duplicate paired event.
+      if (.breseq_table_kind(name) == "junction") next
       pos_col <- if ("position" %in% names(df)) "position" else "start"
-      seq_id_col <- find_seq_id_column(df)
+      row_seqids <- .breseq_wide_seq(df, .breseq_stage_columns(df))
+      seq_id_col <- NULL
+      if (any(nzchar(row_seqids))) {
+        seq_id_col <- ".breseq_normalization_seq"
+        df[[seq_id_col]] <- row_seqids
+      }
+      comparison_keys <- attr(df, "breseq_keys")
 
       # Use seq_id for multi-replicon normalization
       if (!is.null(seq_id_col) && length(genome_lengths) > 1) {
@@ -234,6 +251,8 @@ run_breseq_pipeline <- function(input_dir = ".",
           genome_length = genome_lengths[1]
         )
       }
+      if (!is.null(seq_id_col)) merged_results[[name]][[seq_id_col]] <- NULL
+      attr(merged_results[[name]], "breseq_keys") <- comparison_keys
     }
   }
 
@@ -243,7 +262,9 @@ run_breseq_pipeline <- function(input_dir = ".",
   message("\n[5/7] Saving results to Excel...")
 
   excel_file <- file.path(output_dir, "merged_mutation_results.xlsx")
-  save_merged_results_to_excel(merged_results, excel_file)
+  save_merged_results_to_excel(merged_results, excel_file,
+    highlight_new = highlight_new, clean_headers = clean_headers,
+    sample_labels = sample_labels, sample_order = sample_names)
   results$excel_file <- excel_file
   message("  Saved: ", excel_file)
 
@@ -269,19 +290,18 @@ run_breseq_pipeline <- function(input_dir = ".",
 
         # For multi-replicon, create separate circos plots
         if (length(genome_lengths) > 1) {
-          seq_id_col <- find_seq_id_column(mut_df)
+          row_seqids <- .breseq_wide_seq(mut_df, .breseq_stage_columns(mut_df))
           for (rep_name in names(genome_lengths)) {
             tryCatch({
-              if (!is.null(seq_id_col) && seq_id_col %in% names(mut_df)) {
-                rep_df <- mut_df[mut_df[[seq_id_col]] == rep_name, ]
-              } else {
-                rep_df <- mut_df
-              }
+              rep_df <- mut_df[row_seqids == .breseq_seq(rep_name), , drop = FALSE]
               if (nrow(rep_df) > 0) {
                 fname <- paste0("circos_", gsub("[^a-zA-Z0-9]", "_", rep_name), ".pdf")
                 plot_circos_genome(
                   mutation_data = rep_df,
                   reference_file = reference_file,
+                  samples = sample_names, seqid = rep_name,
+                  genome_length = unname(genome_lengths[[rep_name]]),
+                  hide_intergenic_labels = hide_intergenic_labels,
                   output_file = file.path(plot_dir, fname)
                 )
                 results$plots[[paste0("circos_", rep_name)]] <- file.path(plot_dir, fname)
@@ -293,6 +313,10 @@ run_breseq_pipeline <- function(input_dir = ".",
             plot_circos_genome(
               mutation_data = mut_df,
               reference_file = reference_file,
+              samples = sample_names,
+              seqid = if (is.null(names(genome_lengths))) NULL else names(genome_lengths)[1],
+              genome_length = unname(genome_lengths[1]),
+              hide_intergenic_labels = hide_intergenic_labels,
               output_file = file.path(plot_dir, "circos_genome_map.pdf")
             )
             results$plots$circos <- file.path(plot_dir, "circos_genome_map.pdf")
@@ -469,6 +493,12 @@ merge_comparison_results <- function(comparisons) {
 
       # Merge by position - use empty suffix to avoid duplication
       merged_tbl <- tbl_list[[1]]
+      keys <- attr(merged_tbl, "breseq_keys")
+      key_aware <- !is.null(keys)
+      if (key_aware) {
+        positions <- stats::setNames(merged_tbl[[pos_col]], keys)
+        merged_tbl[[pos_col]] <- keys
+      }
       for (i in seq_along(tbl_list)[-1]) {
         # Get columns that already exist in merged_tbl (excluding position)
         existing_cols <- setdiff(names(merged_tbl), pos_col)
@@ -478,12 +508,25 @@ merge_comparison_results <- function(comparisons) {
         cols_to_add <- setdiff(new_cols, existing_cols)
         if (length(cols_to_add) > 0) {
           add_df <- tbl_list[[i]][, c(pos_col, cols_to_add), drop = FALSE]
+          if (key_aware) {
+            next_keys <- attr(tbl_list[[i]], "breseq_keys")
+            if (is.null(next_keys) || length(next_keys) != nrow(add_df))
+              stop("Cannot mix keyed and legacy comparisons; rebuild the comparisons together.")
+            positions <- c(positions, stats::setNames(add_df[[pos_col]], next_keys))
+            add_df[[pos_col]] <- next_keys
+          }
           merged_tbl <- merge(merged_tbl, add_df, by = pos_col, all = TRUE)
         }
       }
 
       # Remove status columns and duplicates
       merged_tbl <- merged_tbl[, !grepl("^status", names(merged_tbl))]
+      if (key_aware) {
+        keys <- merged_tbl[[pos_col]]
+        merged_tbl[[pos_col]] <- unname(positions[match(keys, names(positions))])
+        attr(merged_tbl, "breseq_keys") <- keys
+      }
+      attr(merged_tbl, "breseq_sample_order") <- attr(.breseq_stage_columns(merged_tbl), "sample_order")
 
       merged[[tbl_name]] <- merged_tbl
     }
@@ -498,8 +541,14 @@ merge_comparison_results <- function(comparisons) {
 #'
 #' @param merged_results Named list of data frames
 #' @param output_file Path to output Excel file
+#' @param highlight_new Shade every reported call by stage; bold new or changed calls.
+#' @param clean_headers Use readable export headers with hidden canonical-column metadata.
+#' @param sample_labels Named sample-ID to display-label map, used only with clean_headers=TRUE.
+#' @param sample_order Optional exact chronological sample order.
 #' @keywords internal
-save_merged_results_to_excel <- function(merged_results, output_file) {
+save_merged_results_to_excel <- function(merged_results, output_file,
+                                         highlight_new = FALSE, clean_headers = FALSE,
+                                         sample_labels = NULL, sample_order = NULL) {
 
   if (!requireNamespace("openxlsx", quietly = TRUE)) {
     stop("Package 'openxlsx' required")
@@ -516,10 +565,13 @@ save_merged_results_to_excel <- function(merged_results, output_file) {
     sheet_name <- substr(sheet_name, 1, 31)  # Excel limit
 
     openxlsx::addWorksheet(wb, sheet_name)
-    openxlsx::writeData(wb, sheet_name, merged_results[[name]])
+    mutation_name <- names(merged_results)[vapply(names(merged_results), function(n) .breseq_table_kind(n) == "mutation", logical(1))]
+    mutation_data <- if (length(mutation_name)) merged_results[[mutation_name[1]]] else NULL
+    .breseq_write_presentation(wb, sheet_name, merged_results[[name]], name,
+      highlight_new, clean_headers, sample_labels, sample_order, mutation_data)
 
     # Add conditional formatting for mutation types if present
-    if ("mutation_type" %in% names(merged_results[[name]])) {
+    if (!highlight_new && !clean_headers && "mutation_type" %in% names(merged_results[[name]])) {
       type_col <- which(names(merged_results[[name]]) == "mutation_type")
       n_rows <- nrow(merged_results[[name]])
 

@@ -10,6 +10,7 @@ compare_named_tables(list_A, list_B, name_A = NULL, name_B = NULL)
 \item{list_A}{A named list of data frames, representing the first set of tables (e.g., control data).}
 
 \item{list_B}{A named list of data frames, representing the second set of tables (e.g., experimental data).}
+\item{name_A, name_B}{Optional sample suffixes used in output column names.}
 }
 \value{
 A named list of data frames containing the comparison results for each table.
@@ -20,7 +21,8 @@ Each data frame includes columns from both input tables and a \code{status} colu
 }
 \description{
 This function compares named tables from two lists (e.g., experimental and control datasets).
-It identifies differences based on a specified column ("position" or "start") depending on the table name.
+Keys include replicon and coordinate. Junction keys include both oriented endpoints;
+input junction rows must occur in endpoint pairs. Changing read metrics do not change event identity.
 }
 \examples{
 # Example usage:

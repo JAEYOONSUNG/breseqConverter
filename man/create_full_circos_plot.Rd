@@ -12,7 +12,11 @@ create_full_circos_plot(
   gff_data = NULL,
   eggnog_data = NULL,
   gc_data = NULL,
-  output_file = "circos_map.pdf"
+  output_file = "circos_map.pdf",
+  hide_intergenic_labels = FALSE,
+  gc_colors = NULL,
+  observed_tracks = FALSE,
+  reverse_tracks = TRUE
 )
 }
 \arguments{
@@ -28,7 +32,28 @@ create_full_circos_plot(
 
 \item{eggnog_data}{Parsed eggNOG data for COG annotation tracks (optional)}
 
+\item{gc_data}{GC content and skew data for inner tracks (optional).}
+
 \item{output_file}{Output PDF file path}
+
+\item{hide_intergenic_labels}{Hide labels whose annotation starts with
+"intergenic" after whitespace normalization (default: FALSE). Mutation marks and data are retained.}
+
+\item{gc_colors}{Optional named character vector overriding any of
+\code{skew_positive}, \code{skew_negative}, \code{ratio_positive}, and
+\code{ratio_negative}. Defaults are green/red (\code{#00FF00}/\code{#FF0000})
+for GC skew and blue/yellow (\code{#0000FF}/\code{#FFFF00}) for GC ratio.
+Colors are recomputed from the corresponding metric deviations at render time;
+cached color columns are ignored. Zero deviation uses the positive color.}
+
+\item{observed_tracks}{If TRUE, each mutation ring contains only calls observed
+in that sample. Default FALSE preserves cumulative tracks. The \code{new} flag
+controls labels only; retained observed calls still receive mutation marks.
+Ring order is unchanged.}
+
+\item{reverse_tracks}{If TRUE (default), the last sample is the outermost ring.
+If FALSE, samples run outside to inside in the supplied order. Sample colors and
+the chronological order used for cumulative calls are unchanged.}
 }
 \value{
 Path to created file

@@ -11,7 +11,8 @@ plot_circos_genome(
   output_file = "genome_map.pdf",
   samples = NULL,
   genome_length = NULL,
-  seqid = NULL
+  seqid = NULL,
+  hide_intergenic_labels = FALSE
 )
 }
 \arguments{
@@ -28,6 +29,9 @@ plot_circos_genome(
 \item{genome_length}{Optional genome length (auto-detected from reference if NULL)}
 
 \item{seqid}{Sequence ID for the genome (auto-detected if NULL)}
+
+\item{hide_intergenic_labels}{Hide labels whose annotation starts with
+"intergenic" after whitespace normalization (default: FALSE). Mutation marks and data are retained.}
 }
 \value{
 Path to the created PDF file

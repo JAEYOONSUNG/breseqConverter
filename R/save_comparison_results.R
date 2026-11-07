@@ -47,7 +47,7 @@ save_comparison_results_to_excel <- function(comparison_results, file_name,
   }
 
   # Save the workbook to the specified file
-  openxlsx::saveWorkbook(wb, file_name, overwrite = TRUE)
+  .breseq_save_table_workbook(wb, file_name)
 
   # Confirm save location
   cat("Excel file saved to:", file_name, "\n")

@@ -1,4 +1,19 @@
 # Shared presentation helpers. Canonical data and sample IDs are never renamed.
+.breseq_save_table_workbook <- function(wb, file) {
+  # openxlsx initializes unused drawing relationships even on text-only sheets.
+  # Some readers follow those links and fail when their target parts do not exist.
+  # Retain relationships when actual drawings, VML or comments are present.
+  for (i in seq_along(wb$worksheets_rels)) {
+    rels <- wb$worksheets_rels[[i]]
+    if (!length(wb$drawings[[i]]))
+      rels <- rels[!grepl('/drawing"', rels, fixed = TRUE)]
+    if (!length(wb$vml[[i]]) && !length(wb$comments[[i]]))
+      rels <- rels[!grepl('/vmlDrawing"', rels, fixed = TRUE)]
+    wb$worksheets_rels[[i]] <- rels
+  }
+  openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
+}
+
 .breseq_text <- function(x) trimws(gsub("\u00a0", " ", as.character(x), fixed = TRUE))
 
 .breseq_stage_columns <- function(data, sample_order = NULL) {
@@ -217,9 +232,11 @@
     return(invisible(NULL))
   }
   openxlsx::modifyBaseFont(wb, fontSize = 10, fontColour = "#333333", fontName = "Arial")
-  body_style <- openxlsx::createStyle(fontName = "Arial", fontSize = 10, fontColour = "#333333")
+  body_style <- openxlsx::createStyle(fontName = "Arial", fontSize = 10,
+    fontColour = "#333333", wrapText = TRUE, valign = "center")
   header_style <- openxlsx::createStyle(fontName = "Arial", fontSize = 10,
-    fontColour = "#333333", textDecoration = "bold", fgFill = "#FFFFFF")
+    fontColour = "#333333", textDecoration = "bold", fgFill = "#FFFFFF",
+    wrapText = TRUE, valign = "center")
   columns <- .breseq_stage_columns(data, sample_order)
   samples <- attr(columns, "sample_order")
   labels <- .breseq_validate_labels(sample_labels, samples)
@@ -255,10 +272,32 @@
   }
   openxlsx::writeData(wb, sheet, displayed)
   if (ncol(displayed)) {
+    widths <- rep(20, ncol(displayed))
+    for (k in seq_len(nrow(columns))) {
+      field <- columns$field[k]
+      widths[columns$index[k]] <- if (field %in% c("description", "product")) 60 else
+        if (field == "annotation") 42 else if (field == "gene") 36 else
+        if (field == "mutation") 24 else 22
+    }
+    widths[names(data) %in% c("position", "start")] <- 17
+    openxlsx::setColWidths(wb, sheet, cols = seq_len(ncol(displayed)), widths = widths)
+    openxlsx::setRowHeights(wb, sheet, rows = 1L, heights = 44)
+    openxlsx::freezePane(wb, sheet, firstActiveRow = 2L,
+      firstActiveCol = min(3L, ncol(displayed) + 1L))
     openxlsx::addStyle(wb, sheet, header_style, rows = 1L,
       cols = seq_len(ncol(displayed)), gridExpand = TRUE)
-    if (nrow(displayed)) openxlsx::addStyle(wb, sheet, body_style,
-      rows = seq_len(nrow(displayed)) + 1L, cols = seq_len(ncol(displayed)), gridExpand = TRUE)
+    if (nrow(displayed)) {
+      openxlsx::addStyle(wb, sheet, body_style, rows = seq_len(nrow(displayed)) + 1L,
+        cols = seq_len(ncol(displayed)), gridExpand = TRUE)
+      heights <- vapply(seq_len(nrow(displayed)), function(i) {
+        lines <- vapply(seq_len(ncol(displayed)), function(j) {
+          text <- as.character(displayed[[j]][i]); if (is.na(text)) return(1)
+          sum(pmax(1, ceiling(nchar(strsplit(text, "\n", fixed = TRUE)[[1]]) / (widths[j] - 3))))
+        }, 1)
+        min(409.5, max(20, max(lines) * 14 + 6))
+      }, 1)
+      openxlsx::setRowHeights(wb, sheet, rows = seq_len(nrow(displayed)) + 1L, heights = heights)
+    }
   }
   if (highlight_new && nrow(data)) {
     status <- .breseq_stage_status(data, table_name, sample_order, mutation_data)

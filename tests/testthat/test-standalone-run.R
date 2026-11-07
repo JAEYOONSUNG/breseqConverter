@@ -33,6 +33,15 @@ test_that("one-file driver runs without pre-existing genome objects", {
   expect_true(all(file.exists(result$plots)))
   expect_true(all(file.info(result$plots)$size > 0))
   expect_true(file.exists(result$excel_file))
+  expect_true(file.exists(result$publication_excel_file))
+  expect_named(result$excel_files, c("comparison", "publication"))
+  expect_true(all(file.exists(result$excel_files)))
+  expect_identical(basename(result$excel_files),
+    c("merged_mutation_results.xlsx", "publication_mutation_results.xlsx"))
+  compact <- openxlsx::read.xlsx(result$publication_excel_file, sheet = "Mutations",
+    startRow = 7, check.names = FALSE)
+  expect_equal(nrow(compact), 3L)
+  expect_equal(ncol(compact), 8L)
   expect_identical(result$counts$raw_calls, c(0L, 2L, 3L))
   expect_identical(result$counts$plot_calls, result$counts$raw_calls)
   expect_equal(nrow(result$genome_export$manifest), 6L)

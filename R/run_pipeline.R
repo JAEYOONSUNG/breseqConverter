@@ -593,7 +593,7 @@ save_merged_results_to_excel <- function(merged_results, output_file,
     }
   }
 
-  openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+  .breseq_save_table_workbook(wb, output_file)
 }
 
 #' Quick Analysis Wrapper

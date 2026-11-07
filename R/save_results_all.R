@@ -45,7 +45,7 @@ save_results_to_excel <- function(results, output_dir = ".",
       highlight_new, clean_headers, sample_labels, sample_order, mutation_data)
     
     # Save the workbook
-    saveWorkbook(wb, file_path, overwrite = TRUE)
+    .breseq_save_table_workbook(wb, file_path)
     cat("Saved:", file_path, "\n")
   }
   

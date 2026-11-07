@@ -124,6 +124,7 @@
   labels <- .breseq_validate_labels(config$sample_labels, order)
   excel_out <- file.path(output, "merged_mutation_results.xlsx")
   wb <- openxlsx::createWorkbook()
+  openxlsx::modifyBaseFont(wb, fontName = "Arial", fontSize = 10)
   sheet_map <- c("Mutation predictions" = "Mutations",
     "Unassigned missing coverage evidence" = "Missing",
     "Unassigned new junction evidence" = "New junction")
@@ -138,7 +139,7 @@
       highlight_new = highlight, clean_headers = TRUE, sample_labels = labels,
       sample_order = order, mutation_data = mutation_data$Mutations)
   }
-  openxlsx::saveWorkbook(wb, excel_out, overwrite = TRUE)
+  .breseq_save_table_workbook(wb, excel_out)
   processed <- process_mutation_data_for_viz(mutation_data, sample_order = order)
   # A workbook may retain region annotations in a sample with no variant call.
   # Annotation/replicon metadata alone must not become an UNKNOWN mutation.
@@ -178,6 +179,21 @@
     raw_calls = unname(raw_counts), plot_calls = unname(plot_counts))
   utils::write.table(counts, file.path(output, "sample_call_counts.tsv"),
                      sep = "\t", row.names = FALSE, quote = FALSE)
+  publication_excel_out <- file.path(output, "publication_mutation_results.xlsx")
+  publication_overrides <- config$publication_annotation_overrides
+  if (is.character(publication_overrides) && length(publication_overrides) == 1L) {
+    if (!file.exists(publication_overrides)) stop("Publication annotation file does not exist: ", publication_overrides)
+    source_files <- c(source_files, publication_overrides)
+    publication_overrides <- utils::read.delim(publication_overrides, check.names = FALSE,
+      stringsAsFactors = FALSE, comment.char = "")
+  }
+  if (!is.null(publication_overrides)) utils::write.table(publication_overrides,
+    file.path(work, "publication_annotations.tsv"), sep = "\t", row.names = FALSE,
+    quote = TRUE, qmethod = "double", na = "")
+  save_publication_results_to_excel(merged, publication_excel_out,
+    sample_order = order, sample_labels = labels, reference_file = reference,
+    gff_file = gff, plot_evidence = display_rows,
+    annotation_overrides = publication_overrides)
   genome_export <- NULL
   create_genbank <- !identical(config$create_genbank, FALSE)
   if (create_genbank) {
@@ -258,12 +274,14 @@
   source_files <- unique(normalizePath(source_files, mustWork = TRUE))
   manifest <- data.frame(path = source_files, md5 = unname(tools::md5sum(source_files)))
   utils::write.table(manifest, file.path(work, "source_manifest.tsv"), sep = "\t", row.names = FALSE, quote = FALSE)
-  result <- list(output_dir = output, excel_file = excel_out, plots = plots,
+  result <- list(output_dir = output, excel_file = excel_out,
+    publication_excel_file = publication_excel_out,
+    excel_files = c(comparison = excel_out, publication = publication_excel_out), plots = plots,
     samples = order, sample_labels = labels, counts = counts,
     mutation_list = calls, merged_results = merged, display_rows = display_rows,
     reference_info = refs$info, genome_export = genome_export)
   saveRDS(result, file.path(work, "one_shot_results.rds"))
-  message("Complete: ", output, "\nCreated ", length(plots), " replicon plots and the combined Excel workbook.")
+  message("Complete: ", output, "\nCreated ", length(plots), " replicon plots and both Excel workbooks (comparison and publication).")
   if (!is.null(genome_export)) message("Changed-sequence files: ", file.path(output, "changed_sequences"))
   invisible(result)
 }

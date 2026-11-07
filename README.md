@@ -209,8 +209,8 @@ are accepted. The intergenic label setting is independent of these colors.
 
 Download [`one_shot.R`](https://raw.githubusercontent.com/JAEYOONSUNG/breseqConverter/master/inst/scripts/one_shot.R)
 for a self-contained entry point. It includes the converter implementation and
-automatically reads the inputs, prepares genome annotations, exports the
-workbook, plots every replicon, and reconstructs changed GenBank sequences.
+automatically reads the inputs, prepares genome annotations, exports two
+workbooks, plots every replicon, and reconstructs changed GenBank sequences.
 When SnapGene's CLI is available it also creates native `.dna` files. It requires the
 listed R libraries, but no breseqConverter installation, external R scripts,
 GenomeDrawer objects, or separate drawing call.
@@ -241,6 +241,44 @@ Canonical merged Excel inputs are also supported. Audited coverage display
 evidence is loaded from `coverage_derived_DEL_rows.tsv` when available, kept
 separate from the original calls, and copied into output provenance. The
 converter does not infer missing coverage values from unavailable summary files.
+
+Every one-shot run writes both Excel files to the output folder:
+
+- `merged_mutation_results.xlsx` retains the complete wide comparison, all
+  reported fields and hidden canonical column metadata for reloading.
+- `publication_mutation_results.xlsx` presents one row per variant or evidence
+  region with compact stage columns. It separates mutations, missing coverage,
+  paired junction evidence and, when supplied, plot-derived evidence. Gene and
+  product annotations come from the supplied reference or GFF. Missing coverage
+  wholly inside a previously called deletion is omitted from the compact view;
+  every source row remains in the wide workbook.
+
+Both use Arial 10 pt. Reported calls remain shaded in each observed stage;
+new or changed calls use bold text. Unreported calls are never filled forward.
+Use `SAMPLE_LABELS` to set the displayed strain names in both files. The returned
+R result includes `excel_files`, with `comparison` and `publication` paths;
+`excel_file` continues to refer to the wide workbook.
+
+Optional publication-only labels can be supplied in
+`PUBLICATION_ANNOTATIONS_FILE`, a tab-separated file with columns `sheet`,
+`seq_id`, `position`, `field` and `value`. Use the reference accession and the
+mutation position, a source start interval for missing coverage, or the displayed
+start coordinate for plot-derived evidence. Only
+annotation fields can be overridden; sample calls remain the original data.
+The source comparison, plots and reconstructed sequences are unaffected.
+
+For an existing native merged comparison, the compact file is also available
+without running the plots or sequence export:
+
+```r
+save_publication_results_to_excel(
+  merged_results, "publication_mutation_results.xlsx",
+  sample_order = sample_ids,
+  sample_labels = c(WT = "Parent", sample1 = "Strain 1",
+                    sample2 = "Strain 2", sample3 = "Final strain"),
+  reference_file = "reference.gbk"
+)
+```
 
 For other datasets, change `INPUT_DIR` and set `SAMPLE_ORDER`, `SAMPLE_LABELS`,
 and `SAMPLE_ALIASES` to `NULL` for automatic sample IDs. Set `BASELINE_ID` to

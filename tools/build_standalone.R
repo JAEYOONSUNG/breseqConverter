@@ -10,6 +10,7 @@ header <- c(
   "# No breseqConverter installation, external R scripts, or GenomeDrawer globals required.",
   "# Required R libraries are checked before reading data. Original inputs are read only.",
   "# Set INPUT_DIR to your data folder. New results are saved outside the inputs.",
+  "# Excel outputs: merged_mutation_results.xlsx and publication_mutation_results.xlsx.",
   "INPUT_DIR <- getwd()  # Or set an absolute path to your breseq input folder",
   "OUTPUT_DIR <- file.path(path.expand('~/Desktop'), paste0('breseqConverter_run_', format(Sys.time(), '%Y%m%d_%H%M%S')))",
   "REFERENCE_FILE <- NULL  # NULL: find the reference GenBank/FASTA automatically",
@@ -22,12 +23,13 @@ header <- c(
   "BASELINE_ID <- 'WT'  # Empty reference baseline when WT was not resequenced",
   "SAMPLE_ALIASES <- NULL # Optional map from audited-evidence IDs to input sample IDs",
   "DISPLAY_DELETIONS_FILE <- NULL  # Auto-find the existing audited coverage evidence TSV",
+  "PUBLICATION_ANNOTATIONS_FILE <- NULL # Optional TSV of publication-only annotation labels",
   "GC_COLORS <- c(skew_positive='#00FF00', skew_negative='#FF0000', ratio_positive='#0000FF', ratio_negative='#FFFF00')",
   "CREATE_GENBANK <- TRUE # Apply called mutations to the sequence, not just annotations",
   "CREATE_DNA <- TRUE     # Convert changed GenBank files when SnapGene CLI is available",
   "SNAPGENE_PATH <- NULL  # NULL: auto-detect; running SnapGene sessions are never closed",
   "# Everything below is bundled implementation; no other code file is loaded.",
-  ".breseq_one_shot_config <- list(input_dir=INPUT_DIR, output_dir=OUTPUT_DIR, reference_file=REFERENCE_FILE, excel_file=EXCEL_FILE, gff_file=GFF_FILE, eggnog_file=EGGNOG_FILE, hide_intergenic_labels=HIDE_INTERGENIC_LABELS, sample_order=SAMPLE_ORDER, sample_labels=SAMPLE_LABELS, baseline_id=BASELINE_ID, sample_aliases=SAMPLE_ALIASES, display_deletions_file=DISPLAY_DELETIONS_FILE, gc_colors=GC_COLORS, create_genbank=CREATE_GENBANK, create_dna=CREATE_DNA, snapgene_path=SNAPGENE_PATH)",
+  ".breseq_one_shot_config <- list(input_dir=INPUT_DIR, output_dir=OUTPUT_DIR, reference_file=REFERENCE_FILE, excel_file=EXCEL_FILE, gff_file=GFF_FILE, eggnog_file=EGGNOG_FILE, hide_intergenic_labels=HIDE_INTERGENIC_LABELS, sample_order=SAMPLE_ORDER, sample_labels=SAMPLE_LABELS, baseline_id=BASELINE_ID, sample_aliases=SAMPLE_ALIASES, display_deletions_file=DISPLAY_DELETIONS_FILE, publication_annotation_overrides=PUBLICATION_ANNOTATIONS_FILE, gc_colors=GC_COLORS, create_genbank=CREATE_GENBANK, create_dna=CREATE_DNA, snapgene_path=SNAPGENE_PATH)",
   "breseq_one_shot <- local({"
 )
 sources <- sort(list.files(file.path(repo, "R"), pattern = "[.]R$", full.names = TRUE))

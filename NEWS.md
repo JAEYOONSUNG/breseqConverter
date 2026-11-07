@@ -1,5 +1,8 @@
 # breseqConverter 1.1.0
 
+* Always export two Excel files from the one-file workflow: the complete wide
+  comparison and a separate compact publication table with per-stage calls,
+  missing-coverage annotations, paired junctions and supplied plot evidence.
 * Reconstruct per-sample changed sequences from finalized calls and export
   annotated GenBank plus native SnapGene DNA through the one-file workflow.
   Audit unsupported calls, feature changes, whole-replicon losses and unresolved

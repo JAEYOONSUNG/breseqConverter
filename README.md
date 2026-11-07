@@ -116,6 +116,20 @@ Use `SAMPLE_LABELS` to set the displayed strain names in both files. The returne
 R result includes `excel_files`, with `comparison` and `publication` paths;
 `excel_file` continues to refer to the wide workbook.
 
+The following details show the same eight chromosome loci from an actual run.
+The wide view places the position column beside the original `42SJY1` evidence,
+mutation and annotation fields. The compact view shows those loci across all
+stages. Both images retain the original worksheet row numbers; only the displayed
+regions were cropped and arranged.
+
+[![Wide Excel detail: eight loci and the original 42SJY1 report fields](docs/images/excel_wide.png)](docs/images/excel_wide.png)
+
+[![Compact Excel detail: the same eight loci across WT, cc, 1, 3 and 6](docs/images/excel_compact.png)](docs/images/excel_compact.png)
+
+Pale fills indicate reported calls, including retained calls; bold indicates new
+or changed calls. A blank source field or an em dash means no call was reported,
+not that a deleted sequence was restored. Click either image to read the detail.
+
 Optional publication-only labels can be supplied in
 `PUBLICATION_ANNOTATIONS_FILE`, a tab-separated file with columns `sheet`,
 `seq_id`, `position`, `field` and `value`. Use the reference accession and the
@@ -209,7 +223,14 @@ all_comparisons <- compare_multiple_tables(lineage)
 
 ## Circos Visualization
 
-<img width="929" height="865" alt="image" src="https://github.com/user-attachments/assets/132092fe-64fe-4a5c-97d5-d675a02595dd" />
+[![Current SJEF4-2 chromosome comparison, with individual variant labels hidden for an overview](docs/images/circos-overview.png)](docs/images/circos-overview.pdf)
+
+Current *G. stearothermophilus* SJEF4-2 chromosome comparison
+(`NZ_CP128449.1`, 3,471,328 bp). Outside to inside: WT reference baseline,
+SJEF4-2* (cc), 42SJY1, 42SJY3 and 42SJY6. All **878 stage-observed marks** remain:
+867 finalized call observations plus 11 coverage-derived display intervals.
+Only individual variant labels are hidden for this overview. Click the image
+for the vector PDF.
 
 ### `run_full_analysis()`
 
@@ -328,7 +349,7 @@ Standard COG functional category colors are used when eggNOG annotations are pro
 
 ---
 
-## SnapGene Export
+## Changed-sequence and annotation export
 
 ### Changed-sequence export
 
@@ -342,6 +363,24 @@ export_changed_sequences_to_genbank(
   output_dir = "changed_sequences"
 )
 ```
+
+### Changed sequence opened in GeneStudio
+
+[![GeneStudio map of the reconstructed 45SJY11 chromosome with all 121 variant labels visible](docs/images/genestudio-45sjy11-map.png)](docs/images/genestudio-45sjy11-map.svg)
+
+This native GeneStudio export shows the actual **45SJY11 changed sequence**:
+3,561,428 bp after applying 121 finalized calls—71 SNPs, 33 insertions,
+13 deletions and 4 replacements—to the EF60045 reference chromosome
+(`NZ_CP128453`). All 121 variant labels are shown, with feature borders making
+short mutation anchors visible; gene annotations are hidden for this view.
+The four unassigned missing-coverage records remain unresolved evidence and
+were **not applied as exact deletions**. Click the image for the editable SVG.
+
+[![GeneStudio linear detail showing 19 SNP and 3 replacement labels in 570 bp of the changed 45SJY11 sequence](docs/images/genestudio-45sjy11-detail.png)](docs/images/genestudio-45sjy11-detail.svg)
+
+The same sequence at higher magnification: changed-sequence coordinates
+325,465–326,034 (570 bp), showing 19 SNPs and 3 replacements. Restriction-site
+labels are off so the variant labels remain readable. Click for the vector SVG.
 
 ### Reference-coordinate annotation export (legacy)
 
@@ -398,10 +437,6 @@ export_mutations_to_genbank(
 
 - `color_by = "type"` — Color by mutation type (SNP, DEL, INS, REP)
 - `color_by = "stage"` — Magenta gradient by detection stage (saturated → pale)
-
-### SnapGene Visualization
-
-<img width="792" height="768" alt="스크린샷 2026-02-06 21 02 41" src="https://github.com/user-attachments/assets/e094a335-ec2c-417b-b0e0-068eaeddd874" />
 
 ---
 

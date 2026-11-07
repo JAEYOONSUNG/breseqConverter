@@ -1,0 +1,136 @@
+{
+  "date": "2026-11-08",
+  "assets": [
+    {
+      "file": "circos-overview.png",
+      "sha256": "d0a8d4ac33e96b560a39e1454f46601f79abf4db26b8fc7fc83a91c8a5881b1c",
+      "pixels": [
+        2520,
+        2520
+      ]
+    },
+    {
+      "file": "circos-overview.pdf",
+      "sha256": "bfdb5c5e81f343f97f8bc17ca4ae0448baeb1455777207d389ca535761861e70"
+    },
+    {
+      "file": "excel_wide.png",
+      "sha256": "d97b6d66fbcce91ef43bcd203a365ce10e324f6a14ac7523a64e58c66db25e00",
+      "pixels": [
+        2796,
+        550
+      ]
+    },
+    {
+      "file": "excel_compact.png",
+      "sha256": "1630fdfaeeeb0a326bb45e9c9ed107afe8219fcd56bc67585f73905ca0e54a2e",
+      "pixels": [
+        3817,
+        578
+      ]
+    },
+    {
+      "file": "genestudio-45sjy11-map.svg",
+      "sha256": "0b6b4c1d1b19bbc4c5a7c03d96dbb15bf26fae497203e354675da6b8336902dc"
+    },
+    {
+      "file": "genestudio-45sjy11-map.png",
+      "sha256": "aa8b4e5d5585585170d04704016c136f5c709ee662f7f3383aa0758a718e3b2a",
+      "pixels": [
+        1956,
+        2760
+      ]
+    },
+    {
+      "file": "genestudio-45sjy11-detail.svg",
+      "sha256": "1eb2829cc5bb773fb722035d20d5a4e8feac71e89968dac14f1403748a52c7c0"
+    },
+    {
+      "file": "genestudio-45sjy11-detail.png",
+      "sha256": "1a51f81c2d042530f971e8f2d1fbeaa2b0110b061ff0543cb9be0245a83b7f27",
+      "pixels": [
+        3244,
+        823
+      ]
+    }
+  ],
+  "circos": {
+    "reference": "NZ_CP128449.1",
+    "reference_length_bp": 3471328,
+    "outside_to_inside": [
+      "SJEF4-2 (WT)",
+      "SJEF4-2*",
+      "42SJY1",
+      "42SJY3",
+      "42SJY6"
+    ],
+    "stage_observed_marks": [
+      0,
+      85,
+      243,
+      267,
+      283
+    ],
+    "finalized_call_observations": 867,
+    "coverage_derived_display_intervals": 11,
+    "presentation": "Per-variant labels suppressed in a copied plotting input; canvas padding adjusted for clear legends. All other fields and marks unchanged.",
+    "source_pdf_sha256": "49b86029de13d6388eb88e30f86fdb1a555602716ce39a8a8721bb5c99f011e5"
+  },
+  "excel": {
+    "wide_source": "merged_mutation_results.xlsx",
+    "wide_sha256": "9cec44b7e72ae99bdc0a45d61e1be9bb6b0ca94133e6c4d8d6c793de182b3e7d",
+    "wide_regions": [
+      "Mutations!A1:A9",
+      "Mutations!N1:S9"
+    ],
+    "compact_source": "publication_mutation_results.xlsx",
+    "compact_sha256": "dc619a3e43646c056919a74dc139aa923b518e51ab89ced72a98708c5bdfa6a5",
+    "compact_regions": [
+      "Mutations!A7:J7",
+      "Mutations!A110:J117"
+    ],
+    "matching_loci": [
+      1001720,
+      1006706,
+      1015856,
+      1034463,
+      1043530,
+      1048101,
+      1058432,
+      1083856
+    ],
+    "presentation": "Actual rendered worksheet pixels, cropped and juxtaposed. Original row numbers retained. No workbook cells, values, styles or files changed."
+  },
+  "genestudio": {
+    "sample": "45SJY11",
+    "reference": "NZ_CP128453",
+    "reference_length_bp": 3650785,
+    "changed_sequence_length_bp": 3561428,
+    "finalized_calls": {
+      "SNP": 71,
+      "INS": 33,
+      "DEL": 13,
+      "REP": 4
+    },
+    "variant_labels": 121,
+    "unresolved_missing_coverage_records": 4,
+    "genbank_sha256": "320c89daa9bf5dce438c7b15e8239402162a9a5d78c51dae5781768bf0a2ac41",
+    "changed_sequence_sha256": "501366404ca6b30a2585b77dd1aeb97abc80fb9be0f43f85302f539560c7bb1b",
+    "gdtools_sequence_identical": true,
+    "presentation": "Native GeneStudio SVG export, rendered to PNG. All 121 variant labels shown; Publication feature borders improve short-anchor visibility. Gene annotations hidden for this variant-focused view. Four unresolved missing-coverage intervals were not applied as exact deletions.",
+    "linear_detail": {
+      "changed_sequence_coordinates_1_based": [
+        325465,
+        326034
+      ],
+      "length_bp": 570,
+      "labels": 22,
+      "call_types": {
+        "SNP": 19,
+        "REP": 3
+      },
+      "cut_sites_shown": false,
+      "presentation": "Native GeneStudio linear SVG export of the same changed sequence, rendered to PNG."
+    }
+  }
+}

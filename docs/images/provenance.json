@@ -2,16 +2,16 @@
   "date": "2026-11-08",
   "assets": [
     {
-      "file": "circos-overview.png",
-      "sha256": "d0a8d4ac33e96b560a39e1454f46601f79abf4db26b8fc7fc83a91c8a5881b1c",
+      "file": "circos-intergenic-hidden.png",
+      "sha256": "c3ee377595f0801b80e2173b3632a3060d9799142414b6534f44c70089ac273a",
       "pixels": [
         2520,
-        2520
+        3240
       ]
     },
     {
-      "file": "circos-overview.pdf",
-      "sha256": "bfdb5c5e81f343f97f8bc17ca4ae0448baeb1455777207d389ca535761861e70"
+      "file": "circos-intergenic-hidden.pdf",
+      "sha256": "927682ab3f03886908e2674d8cd781f3a6973e10c4d9c05a0e9779cc11098f80"
     },
     {
       "file": "excel_wide.png",
@@ -73,8 +73,18 @@
     ],
     "finalized_call_observations": 867,
     "coverage_derived_display_intervals": 11,
-    "presentation": "Per-variant labels suppressed in a copied plotting input; canvas padding adjusted for clear legends. All other fields and marks unchanged.",
-    "source_pdf_sha256": "49b86029de13d6388eb88e30f86fdb1a555602716ce39a8a8721bb5c99f011e5"
+    "presentation": "Original mutation label strings and event rows preserved. Only intergenic labels hidden with hide_intergenic_labels=TRUE; all other eligible labels retained. Render-only layout places legends in a separate footer on a 14-by-18-inch page, preserving the original circle canvas and label size/colors. All mutation marks, coordinates, annotations and GC metrics unchanged.",
+    "source_pdf_sha256": "49b86029de13d6388eb88e30f86fdb1a555602716ce39a8a8721bb5c99f011e5",
+    "hide_intergenic_labels": true,
+    "new_label_candidates": 316,
+    "intergenic_labels_hidden": 98,
+    "labels_shown": 218,
+    "labels_shown_by_stage": {
+      "SJEF4-2*": 37,
+      "42SJY1": 125,
+      "42SJY3": 41,
+      "42SJY6": 15
+    }
   },
   "excel": {
     "wide_source": "merged_mutation_results.xlsx",

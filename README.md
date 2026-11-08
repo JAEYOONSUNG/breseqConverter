@@ -223,14 +223,16 @@ all_comparisons <- compare_multiple_tables(lineage)
 
 ## Circos Visualization
 
-[![Current SJEF4-2 chromosome comparison, with individual variant labels hidden for an overview](docs/images/circos-overview.png)](docs/images/circos-overview.pdf)
+[![SJEF4-2 chromosome comparison with mutation labels visible and only intergenic labels hidden](docs/images/circos-intergenic-hidden.png)](docs/images/circos-intergenic-hidden.pdf)
 
 Current *G. stearothermophilus* SJEF4-2 chromosome comparison
 (`NZ_CP128449.1`, 3,471,328 bp). Outside to inside: WT reference baseline,
 SJEF4-2* (cc), 42SJY1, 42SJY3 and 42SJY6. All **878 stage-observed marks** remain:
 867 finalized call observations plus 11 coverage-derived display intervals.
-Only individual variant labels are hidden for this overview. Click the image
-for the vector PDF.
+Mutation labels remain visible unless annotated as intergenic
+(`hide_intergenic_labels = TRUE`): 218 labels are shown and 98 intergenic labels
+are hidden. Intergenic mutation marks and all source data are retained.
+Click the image for the vector PDF.
 
 ### `run_full_analysis()`
 
